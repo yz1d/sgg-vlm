@@ -14,12 +14,14 @@ imports:
   - common
 
 classes:
-  StopArmState:
-    description: A provenance-carrying assertion about a school bus's mounted stop arm.
+  ObjectState:
+    description: An abstract provenance-carrying state observed on a perceived road user.
+    abstract: true
     attributes:
-      value:
-        description: Asserted stop-arm position.
-        range: StopArmStateValue
+      type:
+        description: Concrete LinkML class of this object state.
+        designates_type: true
+        range: string
         required: true
       confidence:
         description: Final normalized confidence in the state assertion.
@@ -31,6 +33,15 @@ classes:
         range: Provenance
         multivalued: true
         inlined_as_list: true
+        required: true
+
+  StopArmState:
+    description: An assertion about a school bus's mounted stop arm.
+    is_a: ObjectState
+    attributes:
+      value:
+        description: Asserted stop-arm position.
+        range: StopArmStateValue
         required: true
 
 enums:

@@ -67,6 +67,11 @@ classes:
       track_id:
         description: Optional cross-frame identity for the same physical road user.
         range: string
+      states:
+        description: Observed states applicable to this road user.
+        range: ObjectState
+        multivalued: true
+        inlined_as_list: true
       provenance:
         description: Sources supporting the existence, classification, bounding box, or tracking decisions.
         range: RoadUserProvenance
@@ -94,11 +99,6 @@ classes:
   SchoolBus:
     description: A bus used to transport students.
     is_a: Bus
-    attributes:
-      stop_arm_state:
-        description: Optional assertion about the school bus's mounted stop arm.
-        range: StopArmState
-        inlined: true
 
   Motorcycle:
     description: A motorcycle.
