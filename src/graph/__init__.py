@@ -2,9 +2,7 @@ from src.graph.changes import (
     AddObjectState,
     AddRelationship,
     AddRoadUser,
-    RefineRoadUserType,
     SceneChange,
-    SetTrackId,
 )
 from src.graph.models import (
     ObjectState,
@@ -21,9 +19,7 @@ __all__ = [
     "ObjectState",
     "PerceivedRoadUser",
     "Provenance",
-    "RefineRoadUserType",
     "Scene",
     "SceneChange",
-    "SetTrackId",
     "SpatialRelationship",
 ]

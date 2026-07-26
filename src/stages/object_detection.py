@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from src.clients.vlm import VlmClient
 from src.frame import Frame
-from src.graph.changes import AddRoadUser, RefineRoadUserType
+from src.graph.changes import AddRoadUser
 from src.stage import StageOutput
 
 
 class ObjectDetectionStage:
-    """Proposes additions and compatible type refinements for road users."""
+    """Proposes new road users observed in the frame."""
 
     name = "object-detection"
-    allowed_changes = (AddRoadUser, RefineRoadUserType)
+    allowed_changes = (AddRoadUser,)
 
     def __init__(self, client: VlmClient) -> None:
         self.client = client
