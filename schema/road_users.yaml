@@ -87,30 +87,44 @@ classes:
   Car:
     description: A passenger car.
     is_a: Vehicle
+    annotations:
+      object_detection_prompt: car
 
   Truck:
     description: A truck.
     is_a: Vehicle
+    annotations:
+      object_detection_prompt: truck
 
   Bus:
     description: A passenger bus that is not necessarily a school bus.
     is_a: Vehicle
+    annotations:
+      object_detection_prompt: bus
 
   SchoolBus:
     description: A bus used to transport students.
     is_a: Bus
+    annotations:
+      object_detection_prompt: school bus
 
   Motorcycle:
     description: A motorcycle.
     is_a: Vehicle
+    annotations:
+      object_detection_prompt: motorcycle
 
   Cyclist:
     description: A person riding a bicycle.
     is_a: PerceivedRoadUser
+    annotations:
+      object_detection_prompt: cyclist
 
   Pedestrian:
     description: A person traveling on foot.
     is_a: PerceivedRoadUser
+    annotations:
+      object_detection_prompt: pedestrian
 
 enums:
   RoadUserDecision:

@@ -6,6 +6,7 @@ dependencies = [
     "av==18.0.0",
     "pillow==12.3.0",
     "pydantic==2.13.4",
+    "python-dotenv==1.2.2",
     "requests==2.34.2",
 ]
 

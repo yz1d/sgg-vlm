@@ -262,7 +262,9 @@ class Car(Vehicle):
     """
     A passenger car.
     """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'annotations': {'object_detection_prompt': {'tag': 'object_detection_prompt',
+                                                     'value': 'car'}},
+         'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
 
     bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical road user.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
@@ -281,7 +283,9 @@ class Truck(Vehicle):
     """
     A truck.
     """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'annotations': {'object_detection_prompt': {'tag': 'object_detection_prompt',
+                                                     'value': 'truck'}},
+         'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
 
     bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical road user.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
@@ -300,7 +304,9 @@ class Bus(Vehicle):
     """
     A passenger bus that is not necessarily a school bus.
     """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'annotations': {'object_detection_prompt': {'tag': 'object_detection_prompt',
+                                                     'value': 'bus'}},
+         'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
 
     bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical road user.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
@@ -319,7 +325,9 @@ class SchoolBus(Bus):
     """
     A bus used to transport students.
     """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'annotations': {'object_detection_prompt': {'tag': 'object_detection_prompt',
+                                                     'value': 'school bus'}},
+         'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
 
     bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical road user.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
@@ -338,7 +346,9 @@ class Motorcycle(Vehicle):
     """
     A motorcycle.
     """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'annotations': {'object_detection_prompt': {'tag': 'object_detection_prompt',
+                                                     'value': 'motorcycle'}},
+         'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
 
     bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical road user.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
@@ -357,7 +367,9 @@ class Cyclist(PerceivedRoadUser):
     """
     A person riding a bicycle.
     """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'annotations': {'object_detection_prompt': {'tag': 'object_detection_prompt',
+                                                     'value': 'cyclist'}},
+         'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
 
     bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical road user.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
@@ -376,7 +388,9 @@ class Pedestrian(PerceivedRoadUser):
     """
     A person traveling on foot.
     """
-    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
+    linkml_meta: ClassVar[LinkMLMeta] = LinkMLMeta({'annotations': {'object_detection_prompt': {'tag': 'object_detection_prompt',
+                                                     'value': 'pedestrian'}},
+         'from_schema': 'https://w3id.org/sgg-vlm/schema/road-users'})
 
     bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical road user.""", json_schema_extra = { "linkml_meta": {'domain_of': ['PerceivedRoadUser']} })

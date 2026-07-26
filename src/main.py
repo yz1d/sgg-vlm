@@ -4,8 +4,10 @@ import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 
+from src.clients import GroundingDinoProClient
 from src.inputs import Av2Source, VideoSource
 from src.pipeline import Pipeline
+from src.stages import ObjectDetectionStage
 
 DEFAULT_AV2_ROOT = Path("inputs/av2/sensor")
 DEFAULT_OUTPUT_ROOT = Path("outputs")
@@ -42,8 +44,11 @@ def main() -> int:
                 arguments.dataset_root / arguments.split / arguments.log_id,
                 camera_frame_index=arguments.frame,
             )
-        Pipeline().run(source, output_root=output)
-    except (FileNotFoundError, IndexError, OSError, ValueError) as exc:
+        detector = GroundingDinoProClient()
+        Pipeline((ObjectDetectionStage(detector),)).run(
+            source, output_root=output
+        )
+    except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))
     return 0
 
