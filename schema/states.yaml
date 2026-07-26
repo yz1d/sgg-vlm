@@ -1,0 +1,45 @@
+id: https://w3id.org/sgg-vlm/schema/states
+name: sgg_vlm_states
+version: 0.1.0
+description: Object states supported by the sgg-vlm scene graph.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sggvlm: https://w3id.org/sgg-vlm/
+
+default_prefix: sggvlm
+default_range: string
+
+imports:
+  - common
+
+classes:
+  StopArmState:
+    description: A provenance-carrying assertion about a school bus's mounted stop arm.
+    attributes:
+      value:
+        description: Asserted stop-arm position.
+        range: StopArmStateValue
+        required: true
+      confidence:
+        description: Final normalized confidence in the state assertion.
+        range: float
+        minimum_value: 0
+        maximum_value: 1
+      provenance:
+        description: Sources supporting the state assertion.
+        range: Provenance
+        multivalued: true
+        inlined_as_list: true
+        required: true
+
+enums:
+  StopArmStateValue:
+    description: Supported positions of a school bus's mounted stop arm.
+    permissible_values:
+      deployed:
+        description: The stop arm projects outward from the bus.
+      stowed:
+        description: The stop arm is folded against the bus.
+      unknown:
+        description: The stop arm was evaluated but its position could not be determined.

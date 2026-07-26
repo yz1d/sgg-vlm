@@ -1,0 +1,59 @@
+id: https://w3id.org/sgg-vlm/schema/common
+name: sgg_vlm_common
+version: 0.1.0
+description: Shared geometry and provenance structures for the sgg-vlm scene graph.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sggvlm: https://w3id.org/sgg-vlm/
+
+default_prefix: sggvlm
+default_range: string
+
+imports:
+  - linkml:types
+
+classes:
+  Provenance:
+    description: Coarse attribution for a decision represented in the scene graph.
+    attributes:
+      source:
+        description: Dataset, model, or algorithm that produced the decision.
+        range: string
+        required: true
+      stage:
+        description: Pipeline stage that added the decision to the normalized graph.
+        range: string
+        required: true
+      model:
+        description: Exact model identifier when the source is a model.
+        range: string
+      source_confidence:
+        description: Confidence reported by this source for its decision.
+        range: float
+        minimum_value: 0
+        maximum_value: 1
+
+  BoundingBox2D:
+    description: An axis-aligned image-space bounding box measured in pixels.
+    attributes:
+      x_min:
+        description: Minimum horizontal pixel coordinate.
+        range: float
+        minimum_value: 0
+        required: true
+      y_min:
+        description: Minimum vertical pixel coordinate.
+        range: float
+        minimum_value: 0
+        required: true
+      x_max:
+        description: Maximum horizontal pixel coordinate.
+        range: float
+        minimum_value: 0
+        required: true
+      y_max:
+        description: Maximum vertical pixel coordinate.
+        range: float
+        minimum_value: 0
+        required: true

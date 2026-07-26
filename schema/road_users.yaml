@@ -1,0 +1,126 @@
+id: https://w3id.org/sgg-vlm/schema/road-users
+name: sgg_vlm_road_users
+version: 0.1.0
+description: Road-user types supported by the sgg-vlm scene graph.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sggvlm: https://w3id.org/sgg-vlm/
+
+default_prefix: sggvlm
+default_range: string
+
+imports:
+  - common
+  - states
+
+classes:
+  RoadUserProvenance:
+    description: Provenance identifying the parts of a perceived road-user record supported by a source.
+    is_a: Provenance
+    attributes:
+      supports:
+        description: Decisions in the road-user record supported by this source.
+        range: RoadUserDecision
+        multivalued: true
+        required: true
+
+  RoadUser:
+    description: A traffic participant represented in the scene graph.
+    abstract: true
+    attributes:
+      id:
+        description: Identity used to reference this road user within the scene.
+        identifier: true
+        range: string
+        required: true
+      type:
+        description: Concrete LinkML class of this road user.
+        designates_type: true
+        range: string
+        required: true
+
+  EgoVehicle:
+    description: The observing vehicle and reference frame for spatial relationships.
+    is_a: RoadUser
+    slot_usage:
+      id:
+        equals_string: ego
+    attributes:
+      provenance:
+        description: Source establishing ego for this scene.
+        range: Provenance
+        multivalued: true
+        inlined_as_list: true
+        required: true
+
+  PerceivedRoadUser:
+    description: A non-ego road user localized in the input image.
+    is_a: RoadUser
+    abstract: true
+    attributes:
+      bbox:
+        description: Image-space bounding box in pixel XYXY coordinates.
+        range: BoundingBox2D
+        inlined: true
+        required: true
+      track_id:
+        description: Optional cross-frame identity for the same physical road user.
+        range: string
+      provenance:
+        description: Sources supporting the existence, classification, bounding box, or tracking decisions.
+        range: RoadUserProvenance
+        multivalued: true
+        inlined_as_list: true
+        required: true
+
+  Vehicle:
+    description: An abstract perceived motor vehicle.
+    is_a: PerceivedRoadUser
+    abstract: true
+
+  Car:
+    description: A passenger car.
+    is_a: Vehicle
+
+  Truck:
+    description: A truck.
+    is_a: Vehicle
+
+  Bus:
+    description: A passenger bus that is not necessarily a school bus.
+    is_a: Vehicle
+
+  SchoolBus:
+    description: A bus used to transport students.
+    is_a: Bus
+    attributes:
+      stop_arm_state:
+        description: Optional assertion about the school bus's mounted stop arm.
+        range: StopArmState
+        inlined: true
+
+  Motorcycle:
+    description: A motorcycle.
+    is_a: Vehicle
+
+  Cyclist:
+    description: A person riding a bicycle.
+    is_a: PerceivedRoadUser
+
+  Pedestrian:
+    description: A person traveling on foot.
+    is_a: PerceivedRoadUser
+
+enums:
+  RoadUserDecision:
+    description: A decision bundled into a perceived road-user record.
+    permissible_values:
+      existence:
+        description: The road user exists in the scene.
+      classification:
+        description: The road user has the selected concrete type.
+      bounding_box:
+        description: The road user occupies the selected image bounding box.
+      tracking:
+        description: The road user has the selected cross-frame track identity.

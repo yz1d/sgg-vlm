@@ -1,0 +1,69 @@
+id: https://w3id.org/sgg-vlm/schema/relationships
+name: sgg_vlm_relationships
+version: 0.1.0
+description: Ego-relative spatial relationships supported by the sgg-vlm scene graph.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sggvlm: https://w3id.org/sgg-vlm/
+
+default_prefix: sggvlm
+default_range: string
+
+imports:
+  - road_users
+
+classes:
+  SpatialRelationship:
+    description: An abstract spatial relationship from a perceived road user to ego in road coordinates.
+    abstract: true
+    attributes:
+      id:
+        description: Identity of this relationship within the scene.
+        identifier: true
+        range: string
+        required: true
+      type:
+        description: Concrete LinkML class of this relationship.
+        designates_type: true
+        range: string
+        required: true
+      subject:
+        description: Perceived road user whose position is being described.
+        range: PerceivedRoadUser
+        required: true
+      object:
+        description: Ego vehicle used as the spatial reference.
+        range: EgoVehicle
+        required: true
+      confidence:
+        description: Final normalized confidence in the relationship assertion.
+        range: float
+        minimum_value: 0
+        maximum_value: 1
+      provenance:
+        description: Sources supporting the relationship assertion.
+        range: Provenance
+        multivalued: true
+        inlined_as_list: true
+        required: true
+
+  InFrontOf:
+    description: The subject is longitudinally ahead of ego in road coordinates.
+    is_a: SpatialRelationship
+
+  Behind:
+    description: The subject is longitudinally behind ego in road coordinates.
+    is_a: SpatialRelationship
+
+  LeftOf:
+    description: The subject is laterally left of ego relative to ego's road heading.
+    is_a: SpatialRelationship
+
+  RightOf:
+    description: The subject is laterally right of ego relative to ego's road heading.
+    is_a: SpatialRelationship
+
+  Near:
+    description: The subject is within the configured near-distance threshold from ego in road coordinates.
+    is_a: SpatialRelationship
