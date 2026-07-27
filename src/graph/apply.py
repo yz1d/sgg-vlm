@@ -49,23 +49,17 @@ class DefaultGraphChangeApplier:
 
     @staticmethod
     def _add_object_state(graph: Scene, change: AddObjectState) -> None:
-        road_user = next(
-            (
-                road_user
-                for road_user in graph.road_users or []
-                if road_user.id == change.road_user_id
-            ),
-            None,
-        )
-        if road_user is None:
-            raise GraphChangeError(f"Unknown road user: {change.road_user_id}")
-        states = list(road_user.states or [])
-        if any(state.type == change.state.type for state in states):
+        states = list(graph.states or [])
+        candidate = change.state
+        if any(
+            state.subject == candidate.subject and state.type == candidate.type
+            for state in states
+        ):
             raise GraphChangeError(
-                f"Road user {road_user.id} already has state {change.state.type}"
+                f"Road user {candidate.subject} already has state {candidate.type}"
             )
-        states.append(change.state)
-        road_user.states = states
+        states.append(candidate)
+        graph.states = states
 
     @staticmethod
     def _add_relationship(graph: Scene, change: AddRelationship) -> None:

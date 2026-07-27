@@ -69,7 +69,6 @@ class ObjectDetectionStage:
                         x_max=detection.bbox_xyxy[2],
                         y_max=detection.bbox_xyxy[3],
                     ),
-                    "states": [],
                     "provenance": [provenance],
                 }
             )

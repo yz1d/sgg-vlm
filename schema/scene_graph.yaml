@@ -50,6 +50,11 @@ classes:
         range: PerceivedRoadUser
         multivalued: true
         inlined_as_list: true
+      states:
+        description: States observed on perceived road users in this frame.
+        range: ObjectState
+        multivalued: true
+        inlined_as_list: true
       relationships:
         description: Ego-relative spatial relationships derived in road coordinates.
         range: SpatialRelationship

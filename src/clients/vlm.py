@@ -3,14 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Protocol
 
-from src.frame import Image
 from src.traces import JsonValue
+
+
+@dataclass(frozen=True, slots=True)
+class VlmImage:
+    role: str
+    data: bytes
+    media_type: str
 
 
 @dataclass(frozen=True, slots=True)
 class VlmRequest:
     prompt: str
-    images: tuple[Image, ...]
+    images: tuple[VlmImage, ...]
     response_schema: dict[str, JsonValue] | None = None
 
 
@@ -19,6 +25,7 @@ class VlmResponse:
     text: str
     model: str
     raw: JsonValue | None = None
+    request: dict[str, JsonValue] | None = None
 
 
 class VlmClient(Protocol):

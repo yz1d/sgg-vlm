@@ -49,20 +49,32 @@ classes:
         required: true
 
   InFrontOf:
-    description: The subject is longitudinally ahead of ego in road coordinates.
+    description: The subject is longitudinally ahead of ego in road coordinates, regardless of the subject's facing or motion direction.
     is_a: SpatialRelationship
+    annotations:
+      relation_extraction: enabled
+      exclusive_group: longitudinal
 
   Behind:
-    description: The subject is longitudinally behind ego in road coordinates.
+    description: The subject is longitudinally behind ego in road coordinates, regardless of the subject's facing or motion direction.
     is_a: SpatialRelationship
+    annotations:
+      relation_extraction: enabled
+      exclusive_group: longitudinal
 
   LeftOf:
-    description: The subject is laterally left of ego relative to ego's road heading.
+    description: The subject is laterally left of ego relative to ego's road heading, not merely in the left half of the image.
     is_a: SpatialRelationship
+    annotations:
+      relation_extraction: enabled
+      exclusive_group: lateral
 
   RightOf:
-    description: The subject is laterally right of ego relative to ego's road heading.
+    description: The subject is laterally right of ego relative to ego's road heading, not merely in the right half of the image.
     is_a: SpatialRelationship
+    annotations:
+      relation_extraction: enabled
+      exclusive_group: lateral
 
   Near:
     description: The subject is within the configured near-distance threshold from ego in road coordinates.

@@ -10,6 +10,7 @@ from typing import Sequence
 from src.frame import Frame, Image
 from src.graph.apply import DefaultGraphChangeApplier, GraphChangeApplier
 from src.graph.models import Scene
+from src.graph.render import render_graphviz
 from src.graph.validation import DefaultGraphValidator, GraphValidator
 from src.inputs.base import InputContext, InputSource
 from src.stage import Stage
@@ -110,8 +111,18 @@ class Pipeline:
             tempfile.mkdtemp(prefix=f".{destination.name}-", dir=destination.parent)
         )
         try:
-            _write_graph(temporary / "graph.json", graph)
-            self.trace_store.publish(temporary, traces)
+            graph_path = temporary / "graph.json"
+            _write_graph(graph_path, graph)
+            serialized_graph = Scene.model_validate_json(graph_path.read_bytes())
+            stage_traces = (
+                *traces,
+                Trace.bytes(
+                    "graph.png",
+                    render_graphviz(serialized_graph),
+                    media_type="image/png",
+                ),
+            )
+            self.trace_store.publish(temporary, stage_traces)
             if image is not None:
                 source, name = image
                 shutil.copy2(source, temporary / name)

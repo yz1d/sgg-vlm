@@ -17,7 +17,6 @@ class AddRelationship:
 
 @dataclass(frozen=True, slots=True)
 class AddObjectState:
-    road_user_id: str
     state: ObjectState
 
 

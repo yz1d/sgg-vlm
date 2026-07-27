@@ -12,6 +12,7 @@ default_range: string
 
 imports:
   - common
+  - road_users
 
 classes:
   ObjectState:
@@ -22,6 +23,10 @@ classes:
         description: Concrete LinkML class of this object state.
         designates_type: true
         range: string
+        required: true
+      subject:
+        description: Perceived road user whose state is being described.
+        range: PerceivedRoadUser
         required: true
       confidence:
         description: Final normalized confidence in the state assertion.
@@ -38,6 +43,9 @@ classes:
   StopArmState:
     description: An assertion about a school bus's mounted stop arm.
     is_a: ObjectState
+    slot_usage:
+      subject:
+        range: SchoolBus
     attributes:
       value:
         description: Asserted stop-arm position.
@@ -50,7 +58,9 @@ enums:
     permissible_values:
       deployed:
         description: The stop arm projects outward from the bus.
+        annotations:
+          relation_extraction_prompt: The stop arm is visibly extended outward from the side of the bus.
       stowed:
         description: The stop arm is folded against the bus.
-      unknown:
-        description: The stop arm was evaluated but its position could not be determined.
+        annotations:
+          relation_extraction_prompt: The stop arm is visibly folded flat against the side of the bus.

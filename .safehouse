@@ -1,2 +1,4 @@
 add-dirs-ro=~/src/_archives/sgg-vlm.bak
 add-dirs=~/.data
+add-dirs-ro=/Users/eric/skills/tldraw-offline
+add-dirs-ro="/Users/eric/Library/Application Support/tldraw"

@@ -12,7 +12,6 @@ default_range: string
 
 imports:
   - common
-  - states
 
 classes:
   RoadUserProvenance:
@@ -67,11 +66,6 @@ classes:
       track_id:
         description: Optional cross-frame identity for the same physical road user.
         range: string
-      states:
-        description: Observed states applicable to this road user.
-        range: ObjectState
-        multivalued: true
-        inlined_as_list: true
       provenance:
         description: Sources supporting the existence, classification, bounding box, or tracking decisions.
         range: RoadUserProvenance

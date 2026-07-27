@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from typing import Protocol
 
-from src.graph.models import Scene, SchoolBus, StopArmState
+from src.graph.extraction import relationship_targets, state_subject_model
+from src.graph.models import Scene
 
 
 class GraphValidationError(ValueError):
@@ -18,6 +19,7 @@ class DefaultGraphValidator:
 
     def validate(self, graph: Scene) -> None:
         road_users = graph.road_users or []
+        states = graph.states or []
         relationships = graph.relationships or []
         road_user_ids = [road_user.id for road_user in road_users]
         if len(road_user_ids) != len(set(road_user_ids)):
@@ -31,18 +33,39 @@ class DefaultGraphValidator:
                 raise GraphValidationError(
                     f"Road user {road_user.id} has an invalid bounding box"
                 )
-            for state in road_user.states or []:
-                if isinstance(state, StopArmState) and not isinstance(
-                    road_user, SchoolBus
-                ):
-                    raise GraphValidationError(
-                        "StopArmState applies only to SchoolBus road users"
-                    )
+
+        road_user_by_id = {road_user.id: road_user for road_user in road_users}
+        state_keys = [(state.subject, state.type) for state in states]
+        if len(state_keys) != len(set(state_keys)):
+            raise GraphValidationError(
+                "Object-state types must be unique for each road user"
+            )
+        for state in states:
+            subject = road_user_by_id.get(state.subject)
+            if subject is None:
+                raise GraphValidationError(
+                    f"Object state {state.type} has unknown subject {state.subject}"
+                )
+            try:
+                expected_subject = state_subject_model(state)
+            except ValueError as exc:
+                raise GraphValidationError(str(exc)) from exc
+            if not isinstance(subject, expected_subject):
+                raise GraphValidationError(
+                    f"Object state {state.type} requires "
+                    f"{expected_subject.__name__}, got {subject.type}"
+                )
 
         relationship_ids = [relationship.id for relationship in relationships]
         if len(relationship_ids) != len(set(relationship_ids)):
             raise GraphValidationError("Relationship IDs must be unique")
         known_subjects = set(road_user_ids)
+        exclusive_group_by_type = {
+            target.model.__name__: target.exclusive_group
+            for target in relationship_targets()
+            if target.exclusive_group is not None
+        }
+        relationship_groups: set[tuple[str, str]] = set()
         for relationship in relationships:
             if relationship.subject not in known_subjects:
                 raise GraphValidationError(
@@ -53,3 +76,12 @@ class DefaultGraphValidator:
                 raise GraphValidationError(
                     f"Relationship {relationship.id} must target ego"
                 )
+            exclusive_group = exclusive_group_by_type.get(relationship.type)
+            if exclusive_group is not None:
+                key = (relationship.subject, exclusive_group)
+                if key in relationship_groups:
+                    raise GraphValidationError(
+                        f"Road user {relationship.subject} has conflicting "
+                        f"{exclusive_group} relationships"
+                    )
+                relationship_groups.add(key)

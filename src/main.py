@@ -4,21 +4,26 @@ import argparse
 from datetime import UTC, datetime
 from pathlib import Path
 
-from src.clients import GroundingDinoProClient
+from src.clients import GroundingDinoProClient, LiteLlmClient
+from src.config import load_config
 from src.inputs import Av2Source, VideoSource
 from src.pipeline import Pipeline
-from src.stages import ObjectDetectionStage
+from src.stages import ObjectDetectionStage, RelationExtractionStage
 
 DEFAULT_AV2_ROOT = Path("inputs/av2/sensor")
+DEFAULT_VIDEO_ROOT = Path("inputs/videos")
 DEFAULT_OUTPUT_ROOT = Path("outputs")
+DEFAULT_MODEL_CONFIG = Path("models.yaml")
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate a scene graph for one frame")
     subparsers = parser.add_subparsers(dest="source", required=True)
 
-    video = subparsers.add_parser("video", help="Load one frame from a video")
-    video.add_argument("path", type=Path)
+    video = subparsers.add_parser(
+        "video", help="Load one frame from a file in inputs/videos"
+    )
+    video.add_argument("filename", type=_base_filename)
     video.add_argument("--timestamp", type=float, default=0.0)
     video.add_argument("--output", type=Path)
 
@@ -31,12 +36,21 @@ def main() -> int:
     av2.add_argument("--frame", type=int, default=0)
     av2.add_argument("--output", type=Path)
 
+    for source_parser in (video, av2):
+        source_parser.add_argument(
+            "--model-config", type=Path, default=DEFAULT_MODEL_CONFIG
+        )
+        source_parser.add_argument(
+            "--relation-platform",
+            help="Relation-extraction platform from the model config",
+        )
+
     arguments = parser.parse_args()
     output = arguments.output or _new_run_directory()
     try:
         if arguments.source == "video":
             source = VideoSource(
-                arguments.path,
+                DEFAULT_VIDEO_ROOT / arguments.filename,
                 timestamp_seconds=arguments.timestamp,
             )
         else:
@@ -44,13 +58,28 @@ def main() -> int:
                 arguments.dataset_root / arguments.split / arguments.log_id,
                 camera_frame_index=arguments.frame,
             )
-        detector = GroundingDinoProClient()
-        Pipeline((ObjectDetectionStage(detector),)).run(
-            source, output_root=output
+        config = load_config(arguments.model_config)
+        relation_config = config.relation_extraction.select(
+            arguments.relation_platform
         )
+        detector = GroundingDinoProClient()
+        relation_client = LiteLlmClient(relation_config)
+        Pipeline(
+            (
+                ObjectDetectionStage(detector),
+                RelationExtractionStage(relation_client),
+            )
+        ).run(source, output_root=output)
     except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))
     return 0
+
+
+def _base_filename(value: str) -> str:
+    path = Path(value)
+    if path.is_absolute() or path.name != value or value in {"", ".", ".."}:
+        raise argparse.ArgumentTypeError("video must be a base filename")
+    return value
 
 
 def _new_run_directory() -> Path:

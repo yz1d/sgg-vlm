@@ -13,10 +13,10 @@ av2-download-random split="val":
 av2-download log split="val":
     uv run python scripts/av2_downloader.py "{{ log }}" --split "{{ split }}"
 
-# Detect road users in one AV2 front-camera frame.
+# Generate a scene graph for one AV2 front-camera frame.
 av2 log frame="0" split="val":
     uv run python -m src.main av2 "{{ log }}" --split "{{ split }}" --frame "{{ frame }}"
 
-# Detect road users in one video frame.
-video path timestamp="0":
-    uv run python -m src.main video "{{ path }}" --timestamp "{{ timestamp }}"
+# Generate a scene graph for one video frame.
+video filename timestamp="0":
+    uv run python -m src.main video "{{ filename }}" --timestamp "{{ timestamp }}"
