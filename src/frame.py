@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from pathlib import Path
 
-from src.graph.models import Scene
+from src.graph._generated.models import Scene
 
 
 @dataclass(frozen=True, slots=True)

@@ -1,22 +1,15 @@
 from __future__ import annotations
 
 import json
-from typing import Literal, cast
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
 from src.clients.vlm import VlmClient, VlmImage, VlmRequest
 from src.frame import Frame
+from src.graph._generated.catalog import ROAD_REGION_TARGETS
+from src.graph._generated.models import Provenance, Relationship
 from src.graph.changes import AddRelationship, AddRoadRegion
-from src.graph.models import (
-    InIntersection,
-    InLane,
-    Intersection,
-    Lane,
-    Provenance,
-    Relationship,
-    RoadRegion,
-)
 from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
 from src.traces import JsonValue, Trace
@@ -25,7 +18,7 @@ from src.traces import JsonValue, Trace
 class RoadRegionProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    type: Literal["Lane", "Intersection"]
+    type: str
     occupants: list[str] = Field(min_length=1)
 
 
@@ -69,11 +62,21 @@ class RoadLayoutExtractionStage:
                 for road_user in road_users
             ),
         ]
-        prompt = _build_prompt(registry)
+        region_vocabulary: list[JsonValue] = [
+            {
+                "type": target.model.__name__,
+                "description": target.description,
+                "membership_type": target.membership_model.__name__,
+            }
+            for target in ROAD_REGION_TARGETS
+        ]
+        target_by_name = {
+            target.model.__name__: target for target in ROAD_REGION_TARGETS
+        }
+        prompt = _build_prompt(registry, region_vocabulary)
         stage_input: dict[str, JsonValue] = {
             "road_users": registry,
-            "road_region_types": ["Lane", "Intersection"],
-            "relationship_types": ["InLane", "InIntersection"],
+            "road_regions": region_vocabulary,
         }
 
         response = self.client.complete(
@@ -91,38 +94,27 @@ class RoadLayoutExtractionStage:
                         media_type="image/png",
                     ),
                 ),
-                response_schema=cast(
-                    dict[str, JsonValue],
-                    RoadLayoutResponse.model_json_schema(),
-                ),
+                response_schema=_response_schema(tuple(target_by_name)),
             )
         )
         proposals = RoadLayoutResponse.model_validate(_parse_json(response.text))
         _validate_proposals(
             proposals,
             known_subjects={"ego", *(road_user.id for road_user in road_users)},
+            known_region_types=set(target_by_name),
         )
 
-        region_config: dict[
-            str, tuple[type[RoadRegion], type[Relationship], str]
-        ] = {
-            "Lane": (Lane, InLane, "lane"),
-            "Intersection": (
-                Intersection,
-                InIntersection,
-                "intersection",
-            ),
-        }
         used_region_ids = {
             road_region.id for road_region in frame.graph.road_regions or []
         }
-        next_region_index = {"Lane": 1, "Intersection": 1}
+        next_region_index = {name: 1 for name in target_by_name}
         changes: list[AddRoadRegion | AddRelationship] = []
         relationship_specs: list[tuple[type[Relationship], str, str]] = []
         normalized_regions: list[JsonValue] = []
 
         for proposal in proposals.road_regions:
-            region_model, relationship_model, prefix = region_config[proposal.type]
+            target = target_by_name[proposal.type]
+            prefix = target.id_prefix
             index = next_region_index[proposal.type]
             while f"{prefix}_{index:03d}" in used_region_ids:
                 index += 1
@@ -130,7 +122,7 @@ class RoadLayoutExtractionStage:
             next_region_index[proposal.type] = index + 1
             used_region_ids.add(region_id)
 
-            road_region = region_model.model_validate(
+            road_region = target.model.model_validate(
                 {
                     "id": region_id,
                     "provenance": [
@@ -150,7 +142,7 @@ class RoadLayoutExtractionStage:
                 )
             )
             relationship_specs.extend(
-                (relationship_model, subject, region_id)
+                (target.membership_model, subject, region_id)
                 for subject in proposal.occupants
             )
 
@@ -215,15 +207,20 @@ class RoadLayoutExtractionStage:
         )
 
 
-def _build_prompt(registry: list[JsonValue]) -> str:
-    return f"""Identify occupied lanes and occupied intersections.
+def _build_prompt(
+    registry: list[JsonValue], region_vocabulary: list[JsonValue]
+) -> str:
+    return f"""Identify occupied road regions from the schema vocabulary.
 
 The first image is original. The second labels road users. Ego is the camera vehicle.
 Use registry IDs only. Group road users that occupy the same region.
-Treat all lanes equally, regardless of traffic direction. Return only clear facts.
+Return only clear facts.
 
 Road-user registry:
 {json.dumps(registry, separators=(",", ":"))}
+
+Road-region vocabulary:
+{json.dumps(region_vocabulary, separators=(",", ":"))}
 """
 
 
@@ -231,9 +228,12 @@ def _validate_proposals(
     proposals: RoadLayoutResponse,
     *,
     known_subjects: set[str],
+    known_region_types: set[str],
 ) -> None:
     membership_keys: set[tuple[str, str]] = set()
     for region in proposals.road_regions:
+        if region.type not in known_region_types:
+            raise ValueError(f"Unknown road-region type: {region.type}")
         for subject in region.occupants:
             if subject not in known_subjects:
                 raise ValueError(
@@ -245,6 +245,15 @@ def _validate_proposals(
                     f"Road user {subject} occupies more than one {region.type}"
                 )
             membership_keys.add(key)
+
+
+def _response_schema(region_types: tuple[str, ...]) -> dict[str, JsonValue]:
+    schema = RoadLayoutResponse.model_json_schema()
+    proposal = cast(dict[str, Any], schema["$defs"]["RoadRegionProposal"])
+    properties = cast(dict[str, Any], proposal["properties"])
+    type_schema = cast(dict[str, Any], properties["type"])
+    type_schema["enum"] = list(region_types)
+    return cast(dict[str, JsonValue], schema)
 
 
 def _parse_json(text: str) -> JsonValue:

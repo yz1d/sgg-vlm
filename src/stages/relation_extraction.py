@@ -8,14 +8,10 @@ from pydantic import BaseModel, ConfigDict
 
 from src.clients.vlm import VlmClient, VlmImage, VlmRequest
 from src.frame import Frame
+from src.graph._generated.catalog import RELATIONSHIP_TARGETS, STATE_TARGETS
+from src.graph._generated.models import Provenance
 from src.graph.changes import AddObjectState, AddRelationship
-from src.graph.extraction import (
-    RelationshipTarget,
-    StateTarget,
-    relationship_targets,
-    state_targets,
-)
-from src.graph.models import Provenance
+from src.graph.ontology import RelationshipTarget, StateTarget
 from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
 from src.traces import JsonValue, Trace
@@ -54,8 +50,10 @@ class RelationExtractionStage:
 
     def run(self, frame: Frame) -> StageOutput:
         road_users = list(frame.graph.road_users or [])
-        relationship_vocabulary = relationship_targets()
-        state_vocabulary = state_targets()
+        relationship_vocabulary = tuple(
+            target for target in RELATIONSHIP_TARGETS if target.extraction_enabled
+        )
+        state_vocabulary = STATE_TARGETS
         identity_map = render_box_overlay(
             frame.image,
             [
@@ -226,6 +224,7 @@ def _vocabulary_payload(
         "relationships": [
             {
                 "type": target.model.__name__,
+                "description": target.description,
                 "exclusive_group": target.exclusive_group,
             }
             for target in relationships
@@ -233,9 +232,20 @@ def _vocabulary_payload(
         "states": [
             {
                 "type": target.model.__name__,
+                "description": target.description,
                 "subject_type": target.subject_model.__name__,
                 "attributes": {
-                    attribute.name: [value.value for value in attribute.values]
+                    attribute.name: {
+                        "description": attribute.description,
+                        "values": [
+                            {
+                                "value": value.value,
+                                "description": value.description,
+                                "visual_prompt": value.prompt,
+                            }
+                            for value in attribute.values
+                        ],
+                    }
                     for attribute in target.attributes
                 },
             }

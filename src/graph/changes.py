@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.graph.models import (
+from src.graph._generated.models import (
     ObjectState,
     PerceivedRoadUser,
     Relationship,

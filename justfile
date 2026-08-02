@@ -1,6 +1,10 @@
 default:
     @just --list
 
+# Compile the LinkML schema into runtime graph artifacts.
+schema:
+    uv run python scripts/compile_schema.py
+
 # List AV2 Sensor logs and their local download status.
 av2-list split="val":
     uv run python scripts/av2_downloader.py --list --split "{{ split }}"

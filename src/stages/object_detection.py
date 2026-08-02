@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from src.clients.object_detection import ObjectDetectionClient
 from src.frame import Frame
+from src.graph._generated.catalog import DETECTION_TARGETS
 from src.graph.changes import AddRoadUser
-from src.graph.detection import detection_targets
-from src.graph.models import (
+from src.graph._generated.models import (
     BoundingBox2D,
     RoadUserDecision,
     RoadUserProvenance,
@@ -24,7 +24,7 @@ class ObjectDetectionStage:
         self.client = client
 
     def run(self, frame: Frame) -> StageOutput:
-        targets = detection_targets()
+        targets = DETECTION_TARGETS
         if not targets:
             raise ValueError("The graph schema defines no object-detection prompts")
         prompts = tuple(target.prompt for target in targets)
@@ -60,7 +60,7 @@ class ObjectDetectionStage:
                     RoadUserDecision.bounding_box,
                 ],
             )
-            road_user = target.road_user_model.model_validate(
+            road_user = target.model.model_validate(
                 {
                     "id": road_user_id,
                     "bbox": BoundingBox2D(

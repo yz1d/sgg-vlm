@@ -5,7 +5,7 @@ from pathlib import Path
 from typing import Protocol
 
 from src.frame import Frame
-from src.graph.models import EgoVehicle, Provenance, Scene
+from src.graph._generated.models import EgoVehicle, Provenance, Scene
 from src.traces import Trace
 
 

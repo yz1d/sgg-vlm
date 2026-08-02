@@ -5,7 +5,7 @@ from src.graph.changes import (
     AddRoadUser,
     SceneChange,
 )
-from src.graph.models import (
+from src.graph._generated.models import (
     Intersection,
     Lane,
     ObjectState,

@@ -107,6 +107,16 @@ class LiteLlmClient:
                 "VLM response content is empty: "
                 f"model={model}, finish_reason={finish_reason}"
             )
+        if finish_reason == "length":
+            print(
+                f"[vlm] response incomplete: model={model} "
+                f"chars={len(message.content)} "
+                f"elapsed={time.monotonic() - started:.1f}s"
+            )
+            raise ValueError(
+                "VLM response reached its output token limit: "
+                f"model={model}, chars={len(message.content)}"
+            )
         raw = cast(JsonValue, response.model_dump(mode="json"))
         print(
             f"[vlm] request finished: model={model} "

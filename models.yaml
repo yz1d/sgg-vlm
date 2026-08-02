@@ -40,5 +40,5 @@ relation_extraction:
       api_key_env: GEMINI_API_KEY
       timeout_seconds: 120
       parameters:
-        max_tokens: 4096
+        max_tokens: 8192
         reasoning_effort: medium

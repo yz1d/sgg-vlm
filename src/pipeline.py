@@ -9,9 +9,9 @@ from typing import Sequence
 
 from src.frame import Frame, Image
 from src.graph.apply import DefaultGraphChangeApplier, GraphChangeApplier
-from src.graph.models import Scene
+from src.graph._generated.models import Scene
 from src.graph.render import render_graphviz
-from src.graph.validation import DefaultGraphValidator, GraphValidator
+from src.graph.validation import validate_scene
 from src.inputs.base import InputContext, InputSource
 from src.stage import Stage
 from src.traces import FileTraceStore, Trace, TraceStore
@@ -25,12 +25,10 @@ class Pipeline:
         stages: Sequence[Stage] = (),
         *,
         change_applier: GraphChangeApplier | None = None,
-        graph_validator: GraphValidator | None = None,
         trace_store: TraceStore | None = None,
     ) -> None:
         self.stages = tuple(stages)
         self.change_applier = change_applier or DefaultGraphChangeApplier()
-        self.graph_validator = graph_validator or DefaultGraphValidator()
         self.trace_store = trace_store or FileTraceStore()
         for stage in self.stages:
             if not re.fullmatch(r"[a-z][a-z0-9-]*", stage.name):
@@ -47,7 +45,7 @@ class Pipeline:
                 prefix=".input-", dir=output_root
             ) as workspace:
                 loaded = source.load(InputContext(Path(workspace)))
-                self.graph_validator.validate(loaded.frame.graph)
+                validate_scene(loaded.frame.graph)
                 frame_directory = output_root / loaded.frame.graph.frame_id
                 input_directory = frame_directory / "01-input"
                 image_name = _image_name(loaded.frame.image.path)
@@ -80,7 +78,7 @@ class Pipeline:
                 graph = self.change_applier.apply(
                     current.graph, output.changes
                 )
-                self.graph_validator.validate(graph)
+                validate_scene(graph)
                 self._publish_stage(
                     frame_directory / label,
                     graph=graph,

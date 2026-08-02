@@ -5,7 +5,7 @@ import json
 import shutil
 import subprocess
 
-from src.graph.models import Scene
+from src.graph._generated.models import Scene
 
 
 class GraphvizError(RuntimeError):

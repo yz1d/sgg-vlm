@@ -9,7 +9,7 @@ from src.graph.changes import (
     AddRoadUser,
     SceneChange,
 )
-from src.graph.models import Scene
+from src.graph._generated.models import Scene
 
 
 class GraphChangeError(ValueError):
