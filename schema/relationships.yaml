@@ -1,7 +1,7 @@
 id: https://w3id.org/sgg-vlm/schema/relationships
 name: sgg_vlm_relationships
 version: 0.1.0
-description: Ego-relative spatial relationships supported by the sgg-vlm scene graph.
+description: Relationships supported by the sgg-vlm scene graph.
 
 prefixes:
   linkml: https://w3id.org/linkml/
@@ -11,11 +11,12 @@ default_prefix: sggvlm
 default_range: string
 
 imports:
+  - road_regions
   - road_users
 
 classes:
-  SpatialRelationship:
-    description: An abstract spatial relationship from a perceived road user to ego in road coordinates.
+  Relationship:
+    description: An abstract relationship between two entities in the scene graph.
     abstract: true
     attributes:
       id:
@@ -28,24 +29,30 @@ classes:
         designates_type: true
         range: string
         required: true
-      subject:
-        description: Perceived road user whose position is being described.
-        range: PerceivedRoadUser
-        required: true
-      object:
-        description: Ego vehicle used as the spatial reference.
-        range: EgoVehicle
-        required: true
       confidence:
         description: Final normalized confidence in the relationship assertion.
         range: float
         minimum_value: 0
         maximum_value: 1
       provenance:
-        description: Sources supporting the relationship assertion.
+        description: Sources that support the relationship assertion.
         range: Provenance
         multivalued: true
         inlined_as_list: true
+        required: true
+
+  SpatialRelationship:
+    description: An abstract road-coordinate relationship from a perceived road user to ego.
+    abstract: true
+    is_a: Relationship
+    attributes:
+      subject:
+        description: Perceived road user described relative to ego.
+        range: PerceivedRoadUser
+        required: true
+      object:
+        description: Ego vehicle used as the spatial reference.
+        range: EgoVehicle
         required: true
 
   InFrontOf:
@@ -79,3 +86,35 @@ classes:
   Near:
     description: The subject is within the configured near-distance threshold from ego in road coordinates.
     is_a: SpatialRelationship
+
+  RoadRegionRelationship:
+    description: An abstract relationship from a road user to a road region.
+    abstract: true
+    is_a: Relationship
+    attributes:
+      subject:
+        description: Road user located in the road region.
+        range: RoadUser
+        required: true
+      object:
+        description: Road region that contains the road user's ground reference point.
+        range: RoadRegion
+        required: true
+
+  InLane:
+    description: The subject's ground reference point lies in the lane.
+    is_a: RoadRegionRelationship
+    slot_usage:
+      object:
+        range: Lane
+    annotations:
+      exclusive_group: lane_membership
+
+  InIntersection:
+    description: The subject's ground reference point lies in the intersection.
+    is_a: RoadRegionRelationship
+    slot_usage:
+      object:
+        range: Intersection
+    annotations:
+      exclusive_group: intersection_membership

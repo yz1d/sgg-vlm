@@ -1,0 +1,44 @@
+id: https://w3id.org/sgg-vlm/schema/road-regions
+name: sgg_vlm_road_regions
+version: 0.1.0
+description: Road-region types supported by the sgg-vlm scene graph.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sggvlm: https://w3id.org/sgg-vlm/
+
+default_prefix: sggvlm
+default_range: string
+
+imports:
+  - common
+
+classes:
+  RoadRegion:
+    description: An image-derived road surface region represented in the scene graph.
+    abstract: true
+    attributes:
+      id:
+        description: Identity used to reference this road region within the scene.
+        identifier: true
+        range: string
+        required: true
+      type:
+        description: Concrete LinkML class of this road region.
+        designates_type: true
+        range: string
+        required: true
+      provenance:
+        description: Sources that support the existence and classification of this road region.
+        range: Provenance
+        multivalued: true
+        inlined_as_list: true
+        required: true
+
+  Lane:
+    description: A visible road corridor for one line of traffic, independent of its direction relative to ego.
+    is_a: RoadRegion
+
+  Intersection:
+    description: A shared road region where traffic paths meet or cross.
+    is_a: RoadRegion

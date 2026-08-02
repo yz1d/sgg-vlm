@@ -8,7 +8,11 @@ from src.clients import GroundingDinoProClient, LiteLlmClient
 from src.config import load_config
 from src.inputs import Av2Source, VideoSource
 from src.pipeline import Pipeline
-from src.stages import ObjectDetectionStage, RelationExtractionStage
+from src.stages import (
+    ObjectDetectionStage,
+    RelationExtractionStage,
+    RoadLayoutExtractionStage,
+)
 
 DEFAULT_AV2_ROOT = Path("inputs/av2/sensor")
 DEFAULT_VIDEO_ROOT = Path("inputs/videos")
@@ -42,7 +46,7 @@ def main() -> int:
         )
         source_parser.add_argument(
             "--relation-platform",
-            help="Relation-extraction platform from the model config",
+            help="VLM platform for road-layout and relation extraction",
         )
 
     arguments = parser.parse_args()
@@ -67,6 +71,7 @@ def main() -> int:
         Pipeline(
             (
                 ObjectDetectionStage(detector),
+                RoadLayoutExtractionStage(relation_client),
                 RelationExtractionStage(relation_client),
             )
         ).run(source, output_root=output)

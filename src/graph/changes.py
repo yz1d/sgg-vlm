@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.graph.models import ObjectState, PerceivedRoadUser, SpatialRelationship
+from src.graph.models import (
+    ObjectState,
+    PerceivedRoadUser,
+    Relationship,
+    RoadRegion,
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -11,8 +16,13 @@ class AddRoadUser:
 
 
 @dataclass(frozen=True, slots=True)
+class AddRoadRegion:
+    road_region: RoadRegion
+
+
+@dataclass(frozen=True, slots=True)
 class AddRelationship:
-    relationship: SpatialRelationship
+    relationship: Relationship
 
 
 @dataclass(frozen=True, slots=True)
@@ -20,4 +30,6 @@ class AddObjectState:
     state: ObjectState
 
 
-type SceneChange = AddRoadUser | AddRelationship | AddObjectState
+type SceneChange = (
+    AddRoadUser | AddRoadRegion | AddRelationship | AddObjectState
+)

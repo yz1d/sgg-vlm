@@ -33,7 +33,7 @@ class ObjectStateProposal(BaseModel):
 
     subject: str
     type: str
-    attributes: dict[str, JsonValue]
+    attributes: dict[str, str]
 
 
 class ExtractionResponse(BaseModel):
@@ -113,6 +113,10 @@ class RelationExtractionStage:
                         data=identity_map,
                         media_type="image/png",
                     ),
+                ),
+                response_schema=cast(
+                    dict[str, JsonValue],
+                    ExtractionResponse.model_json_schema(),
                 ),
             )
         )
@@ -222,7 +226,6 @@ def _vocabulary_payload(
         "relationships": [
             {
                 "type": target.model.__name__,
-                "description": target.description,
                 "exclusive_group": target.exclusive_group,
             }
             for target in relationships
@@ -230,19 +233,9 @@ def _vocabulary_payload(
         "states": [
             {
                 "type": target.model.__name__,
-                "description": target.description,
-                "applies_to": target.subject_model.__name__,
+                "subject_type": target.subject_model.__name__,
                 "attributes": {
-                    attribute.name: {
-                        "description": attribute.description,
-                        "values": [
-                            {
-                                "value": value.value,
-                                "description": value.description,
-                            }
-                            for value in attribute.values
-                        ],
-                    }
+                    attribute.name: [value.value for value in attribute.values]
                     for attribute in target.attributes
                 },
             }
@@ -254,14 +247,11 @@ def _vocabulary_payload(
 def _build_prompt(
     registry: list[JsonValue], vocabulary: dict[str, JsonValue]
 ) -> str:
-    return f"""Extract only the schema-defined relationships and object states visible in this single forward-facing driving frame.
+    return f"""Extract clear schema-defined facts for these road users.
 
-The first image is the authoritative untouched frame. The second image is the same frame with road-user IDs and boxes; its annotations are localization aids and are not scene content.
-
-Use only road-user IDs from the registry. Do not add, remove, classify, or resize road users. Every relationship describes one road user relative to ego. Emit at most one relationship from each exclusive_group for each road user. Position relationships do not describe the direction a road user is facing or moving.
-
-Emit an object state only when it applies to the road-user type and the image clearly supports one listed attribute value. Omit uncertain relationships and states. Return exactly one JSON object and no other text, with this shape:
-{{"relationships":[{{"subject":"road_user_001","type":"InFrontOf"}}],"states":[{{"subject":"road_user_002","type":"StopArmState","attributes":{{"value":"deployed"}}}}]}}
+The first image is original. The second labels road users. Ego is the camera vehicle.
+Every relationship describes one road user relative to ego.
+Use only the registry and vocabulary. Return only clear facts.
 
 Road-user registry:
 {json.dumps(registry, separators=(",", ":"))}

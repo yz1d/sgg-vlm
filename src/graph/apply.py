@@ -5,6 +5,7 @@ from typing import Protocol, Sequence
 from src.graph.changes import (
     AddObjectState,
     AddRelationship,
+    AddRoadRegion,
     AddRoadUser,
     SceneChange,
 )
@@ -29,6 +30,8 @@ class DefaultGraphChangeApplier:
         for change in changes:
             if isinstance(change, AddRoadUser):
                 self._add_road_user(updated, change)
+            elif isinstance(change, AddRoadRegion):
+                self._add_road_region(updated, change)
             elif isinstance(change, AddRelationship):
                 self._add_relationship(updated, change)
             elif isinstance(change, AddObjectState):
@@ -46,6 +49,19 @@ class DefaultGraphChangeApplier:
             raise GraphChangeError(f"Duplicate road-user ID: {change.road_user.id}")
         road_users.append(change.road_user)
         graph.road_users = road_users
+
+    @staticmethod
+    def _add_road_region(graph: Scene, change: AddRoadRegion) -> None:
+        road_regions = list(graph.road_regions or [])
+        if any(
+            road_region.id == change.road_region.id
+            for road_region in road_regions
+        ):
+            raise GraphChangeError(
+                f"Duplicate road-region ID: {change.road_region.id}"
+            )
+        road_regions.append(change.road_region)
+        graph.road_regions = road_regions
 
     @staticmethod
     def _add_object_state(graph: Scene, change: AddObjectState) -> None:

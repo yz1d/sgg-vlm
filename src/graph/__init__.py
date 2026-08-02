@@ -1,13 +1,18 @@
 from src.graph.changes import (
     AddObjectState,
     AddRelationship,
+    AddRoadRegion,
     AddRoadUser,
     SceneChange,
 )
 from src.graph.models import (
+    Intersection,
+    Lane,
     ObjectState,
     PerceivedRoadUser,
     Provenance,
+    Relationship,
+    RoadRegion,
     Scene,
     SpatialRelationship,
 )
@@ -15,10 +20,15 @@ from src.graph.models import (
 __all__ = [
     "AddObjectState",
     "AddRelationship",
+    "AddRoadRegion",
     "AddRoadUser",
+    "Intersection",
+    "Lane",
     "ObjectState",
     "PerceivedRoadUser",
     "Provenance",
+    "Relationship",
+    "RoadRegion",
     "Scene",
     "SceneChange",
     "SpatialRelationship",

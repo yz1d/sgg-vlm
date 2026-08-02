@@ -2,9 +2,8 @@ id: https://w3id.org/sgg-vlm/schema
 name: sgg_vlm
 version: 0.1.0
 description: >-
-  The normalized scene graph produced by sgg-vlm. The schema contains only the
-  road-user types, object state, and ego-relative spatial relationships that the
-  current pipeline supports.
+  The normalized scene graph produced by sgg-vlm. The schema contains road users,
+  road regions, object states, and relationships supported by the pipeline.
 
 prefixes:
   linkml: https://w3id.org/linkml/
@@ -18,6 +17,7 @@ imports:
   - common
   - states
   - road_users
+  - road_regions
   - relationships
 
 classes:
@@ -50,13 +50,18 @@ classes:
         range: PerceivedRoadUser
         multivalued: true
         inlined_as_list: true
+      road_regions:
+        description: Road regions perceived in the frame.
+        range: RoadRegion
+        multivalued: true
+        inlined_as_list: true
       states:
         description: States observed on perceived road users in this frame.
         range: ObjectState
         multivalued: true
         inlined_as_list: true
       relationships:
-        description: Ego-relative spatial relationships derived in road coordinates.
-        range: SpatialRelationship
+        description: Relationships between entities represented in the scene.
+        range: Relationship
         multivalued: true
         inlined_as_list: true

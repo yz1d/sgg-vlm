@@ -91,13 +91,26 @@ class LiteLlmClient:
             )
             raise
 
-        message = response.choices[0].message
-        if not isinstance(message.content, str):
-            raise ValueError("VLM response content must be text")
-        raw = cast(JsonValue, response.model_dump(mode="json"))
+        choice = response.choices[0]
+        message = choice.message
         model = str(response.model or self.config.model)
+        finish_reason = str(choice.finish_reason or "unspecified")
+        if not isinstance(message.content, str) or not message.content.strip():
+            print(
+                f"[vlm] response invalid: model={model} "
+                f"finish_reason={finish_reason} "
+                f"elapsed={time.monotonic() - started:.1f}s"
+            )
+            if not isinstance(message.content, str):
+                raise ValueError("VLM response content must be text")
+            raise ValueError(
+                "VLM response content is empty: "
+                f"model={model}, finish_reason={finish_reason}"
+            )
+        raw = cast(JsonValue, response.model_dump(mode="json"))
         print(
             f"[vlm] request finished: model={model} "
+            f"finish_reason={finish_reason} chars={len(message.content)} "
             f"elapsed={time.monotonic() - started:.1f}s"
         )
         request_manifest: dict[str, JsonValue] = {

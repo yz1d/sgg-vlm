@@ -67,6 +67,17 @@ def graph_to_dot(graph: Scene) -> str:
             f"[label={quoted(label)}, fillcolor={quoted(color_for(road_user.type))}];"
         )
 
+    road_regions = sorted(
+        graph.road_regions or [], key=lambda road_region: road_region.id
+    )
+    for road_region in road_regions:
+        label = f"{road_region.id}\n{road_region.type}"
+        lines.append(
+            f"  {quoted(road_region.id)} "
+            f"[label={quoted(label)}, shape=box, "
+            f"fillcolor={quoted(color_for(road_region.type))}];"
+        )
+
     relations_by_pair: dict[tuple[str, str], list[str]] = {}
     for relationship in graph.relationships or []:
         relations_by_pair.setdefault(
@@ -89,6 +100,13 @@ def graph_to_dot(graph: Scene) -> str:
                     f'  "ego" -> {quoted(road_user_id)} '
                     "[style=invis, weight=100];"
                 )
+
+    road_region_ids = [road_region.id for road_region in road_regions]
+    if road_region_ids:
+        lines.append(
+            f"  {{ rank=max; "
+            f"{'; '.join(quoted(item) for item in road_region_ids)}; }}"
+        )
 
     for (subject, object_), relationship_types in sorted(relations_by_pair.items()):
         label = "\n".join(dict.fromkeys(relationship_types))
