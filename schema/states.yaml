@@ -28,11 +28,6 @@ classes:
         description: Perceived road user whose state is being described.
         range: PerceivedRoadUser
         required: true
-      confidence:
-        description: Final normalized confidence in the state assertion.
-        range: float
-        minimum_value: 0
-        maximum_value: 1
       provenance:
         description: Sources supporting the state assertion.
         range: Provenance

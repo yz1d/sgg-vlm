@@ -106,7 +106,6 @@ class ObjectDetectionStage:
                 Trace.bytes(
                     "overlay.png",
                     render_box_overlay(frame.image, annotations),
-                    media_type="image/png",
                 ),
             ),
         )

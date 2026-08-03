@@ -168,9 +168,7 @@ class RoadLayoutExtractionStage:
                 Trace.text("prompt.txt", prompt),
                 Trace.json("stage-input.json", stage_input),
                 Trace.json("request.json", request_trace),
-                Trace.bytes(
-                    "identity-map.png", identity_map, media_type="image/png"
-                ),
+                Trace.bytes("identity-map.png", identity_map),
                 Trace.json("response.raw.json", response.raw),
                 Trace.text("response.txt", response.text),
                 Trace.json("road-regions.json", normalized_regions),

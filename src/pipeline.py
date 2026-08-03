@@ -13,20 +13,14 @@ from src.graph.render import GraphvizError, render_graphviz
 from src.graph.validation import validate_scene
 from src.inputs.base import InputContext, InputSource
 from src.stage import Stage, apply_stage_output
-from src.traces import FileTraceStore, Trace, TraceStore
+from src.traces import Trace, publish_traces
 
 
 class Pipeline:
     """Run one input frame through ordered graph enrichment stages."""
 
-    def __init__(
-        self,
-        stages: Sequence[Stage] = (),
-        *,
-        trace_store: TraceStore | None = None,
-    ) -> None:
+    def __init__(self, stages: Sequence[Stage] = ()) -> None:
         self.stages = tuple(stages)
-        self.trace_store = trace_store or FileTraceStore()
         for stage in self.stages:
             if not re.fullmatch(r"[a-z][a-z0-9-]*", stage.name):
                 raise ValueError(f"Invalid stage name: {stage.name}")
@@ -109,17 +103,16 @@ class Pipeline:
                     f"stage={destination.name} error={exc}"
                 )
             else:
-                stage_traces.append(
-                    Trace.bytes(
-                        "graph.png",
-                        graph_png,
-                        media_type="image/png",
-                    )
-                )
-            self.trace_store.publish(temporary, stage_traces)
+                stage_traces.append(Trace.bytes("graph.png", graph_png))
+            publish_traces(temporary, stage_traces)
             if image is not None:
                 source, name = image
-                shutil.copy2(source, temporary / name)
+                image_destination = temporary / name
+                if image_destination.exists():
+                    raise FileExistsError(
+                        f"Input image output already exists: {image_destination}"
+                    )
+                shutil.copy2(source, image_destination)
             temporary.replace(destination)
         except Exception:
             shutil.rmtree(temporary, ignore_errors=True)

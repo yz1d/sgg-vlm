@@ -25,8 +25,6 @@ class SourceFrame:
 
 
 class InputSource(Protocol):
-    name: str
-
     def load(self, context: InputContext) -> SourceFrame: ...
 
 

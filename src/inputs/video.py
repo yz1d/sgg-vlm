@@ -15,8 +15,6 @@ from src.traces import JsonValue, Trace
 class VideoSource:
     """Load one front-camera frame from a video presentation timestamp."""
 
-    name = "input"
-
     def __init__(self, path: Path, *, timestamp_seconds: float = 0.0) -> None:
         self.path = Path(path)
         if not self.path.is_file():

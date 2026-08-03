@@ -262,7 +262,6 @@ class ObjectState(ConfiguredBaseModel):
     """
     type: Literal["ObjectState"] = Field(default="ObjectState", description="""Concrete LinkML class of this object state.""")
     subject: str = Field(default=..., description="""Perceived road user whose state is being described.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the state assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources supporting the state assertion.""")
 
 
@@ -273,7 +272,6 @@ class StopArmState(ObjectState):
     value: StopArmStateValue = Field(default=..., description="""Asserted stop-arm position.""")
     type: Literal["StopArmState"] = Field(default="StopArmState", description="""Concrete LinkML class of this object state.""")
     subject: str = Field(default=..., description="""Perceived road user whose state is being described.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the state assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources supporting the state assertion.""")
 
 
@@ -310,7 +308,6 @@ class Relationship(ConfiguredBaseModel):
     """
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["Relationship"] = Field(default="Relationship", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -322,7 +319,6 @@ class SpatialRelationship(Relationship):
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["SpatialRelationship"] = Field(default="SpatialRelationship", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -334,7 +330,6 @@ class InFrontOf(SpatialRelationship):
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["InFrontOf"] = Field(default="InFrontOf", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -346,7 +341,6 @@ class Behind(SpatialRelationship):
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["Behind"] = Field(default="Behind", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -358,7 +352,6 @@ class LeftOf(SpatialRelationship):
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["LeftOf"] = Field(default="LeftOf", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -370,19 +363,6 @@ class RightOf(SpatialRelationship):
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["RightOf"] = Field(default="RightOf", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
-
-
-class Near(SpatialRelationship):
-    """
-    The subject is within the configured near-distance threshold from ego in road coordinates.
-    """
-    subject: str = Field(default=..., description="""Perceived road user described relative to ego.""")
-    object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["Near"] = Field(default="Near", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -394,7 +374,6 @@ class RoadRegionRelationship(Relationship):
     object: str = Field(default=..., description="""Road region that contains the road user's ground reference point.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["RoadRegionRelationship"] = Field(default="RoadRegionRelationship", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -406,7 +385,6 @@ class InLane(RoadRegionRelationship):
     object: str = Field(default=..., description="""Road region that contains the road user's ground reference point.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["InLane"] = Field(default="InLane", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -418,7 +396,6 @@ class InIntersection(RoadRegionRelationship):
     object: str = Field(default=..., description="""Road region that contains the road user's ground reference point.""")
     id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
     type: Literal["InIntersection"] = Field(default="InIntersection", description="""Concrete LinkML class of this relationship.""")
-    confidence: Optional[float] = Field(default=None, description="""Final normalized confidence in the relationship assertion.""", ge=0, le=1)
     provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
 
 
@@ -433,7 +410,7 @@ class Scene(ConfiguredBaseModel):
     road_users: Optional[list[Annotated[Union[Bus,Car,Cyclist,Motorcycle,Pedestrian,SchoolBus,Truck], Field(discriminator="type")]]] = Field(default=None, description="""Road users perceived in the frame, excluding ego.""")
     road_regions: Optional[list[Annotated[Union[Intersection,Lane], Field(discriminator="type")]]] = Field(default=None, description="""Road regions perceived in the frame.""")
     states: Optional[list[StopArmState]] = Field(default=None, description="""States observed on perceived road users in this frame.""")
-    relationships: Optional[list[Annotated[Union[Behind,InFrontOf,InIntersection,InLane,LeftOf,Near,RightOf], Field(discriminator="type")]]] = Field(default=None, description="""Relationships between entities represented in the scene.""")
+    relationships: Optional[list[Annotated[Union[Behind,InFrontOf,InIntersection,InLane,LeftOf,RightOf], Field(discriminator="type")]]] = Field(default=None, description="""Relationships between entities represented in the scene.""")
 
 
 # Model rebuild
@@ -463,7 +440,6 @@ InFrontOf.model_rebuild()
 Behind.model_rebuild()
 LeftOf.model_rebuild()
 RightOf.model_rebuild()
-Near.model_rebuild()
 RoadRegionRelationship.model_rebuild()
 InLane.model_rebuild()
 InIntersection.model_rebuild()

@@ -50,7 +50,7 @@ def graph_to_dot(graph: Scene) -> str:
     for state in graph.states or []:
         values = state.model_dump(
             mode="json",
-            exclude={"type", "subject", "confidence", "provenance"},
+            exclude={"type", "subject", "provenance"},
             exclude_none=True,
         )
         detail = ", ".join(f"{name}={value}" for name, value in values.items())

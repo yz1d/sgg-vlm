@@ -93,7 +93,7 @@ def _catalog_source(view: SchemaView) -> str:
         )
 
     state_targets = []
-    system_fields = {"type", "subject", "confidence", "provenance"}
+    system_fields = {"type", "subject", "provenance"}
     for name in _concrete_descendants(view, "ObjectState"):
         definition = _required_class(view, name)
         subject_range = str(view.induced_slot("subject", name).range)

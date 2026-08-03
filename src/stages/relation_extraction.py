@@ -77,9 +77,7 @@ class RelationExtractionStage:
                     Trace.text("prompt.txt", prompt),
                     Trace.json("stage-input.json", stage_input),
                     Trace.json("request.json", {"skipped": "no road users"}),
-                    Trace.bytes(
-                        "identity-map.png", identity_map, media_type="image/png"
-                    ),
+                    Trace.bytes("identity-map.png", identity_map),
                     Trace.json("relationships.json", []),
                     Trace.json("states.json", []),
                 )
@@ -177,9 +175,7 @@ class RelationExtractionStage:
                 Trace.text("prompt.txt", prompt),
                 Trace.json("stage-input.json", stage_input),
                 Trace.json("request.json", request_trace),
-                Trace.bytes(
-                    "identity-map.png", identity_map, media_type="image/png"
-                ),
+                Trace.bytes("identity-map.png", identity_map),
                 Trace.json("response.raw.json", response.raw),
                 Trace.text("response.txt", response.text),
                 Trace.json("relationships.json", normalized_relationships),

@@ -13,8 +13,6 @@ FRONT_CAMERA = "ring_front_center"
 class Av2Source:
     """Load one raw front-center image from an Argoverse 2 Sensor log."""
 
-    name = "input"
-
     def __init__(self, log_directory: Path, *, camera_frame_index: int = 0) -> None:
         self.log_directory = Path(log_directory)
         if camera_frame_index < 0:

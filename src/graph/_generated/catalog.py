@@ -16,7 +16,6 @@ from src.graph._generated.models import (
     Lane,
     LeftOf,
     Motorcycle,
-    Near,
     Pedestrian,
     PerceivedRoadUser,
     RightOf,
@@ -123,14 +122,6 @@ RELATIONSHIP_TARGETS = (
         object_model=EgoVehicle,
         exclusive_group='lateral',
         extraction_enabled=True,
-    ),
-    RelationshipTarget(
-        model=Near,
-        description='The subject is within the configured near-distance threshold from ego in road coordinates.',
-        subject_model=PerceivedRoadUser,
-        object_model=EgoVehicle,
-        exclusive_group=None,
-        extraction_enabled=False,
     ),
     RelationshipTarget(
         model=RightOf,

@@ -29,11 +29,6 @@ classes:
         designates_type: true
         range: string
         required: true
-      confidence:
-        description: Final normalized confidence in the relationship assertion.
-        range: float
-        minimum_value: 0
-        maximum_value: 1
       provenance:
         description: Sources that support the relationship assertion.
         range: Provenance
@@ -82,10 +77,6 @@ classes:
     annotations:
       relation_extraction: enabled
       exclusive_group: lateral
-
-  Near:
-    description: The subject is within the configured near-distance threshold from ego in road coordinates.
-    is_a: SpatialRelationship
 
   RoadRegionRelationship:
     description: An abstract relationship from a road user to a road region.
