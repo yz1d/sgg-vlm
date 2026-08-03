@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 import argparse
-from datetime import UTC, datetime
+import re
+import subprocess
+import time
 from pathlib import Path
 
 from src.clients import GroundingDinoProClient, LiteLlmClient
@@ -53,6 +55,10 @@ def main() -> int:
             )
         config = load_config(MODEL_CONFIG)
         vlm_client = LiteLlmClient(config.select())
+        run_directory = _new_run_directory(
+            source=arguments.source,
+            vlm=config.default_platform,
+        )
         detector = GroundingDinoProClient()
         Pipeline(
             (
@@ -61,7 +67,7 @@ def main() -> int:
                 RelationExtractionStage(vlm_client),
                 WeatherExtractionStage(vlm_client),
             )
-        ).run(source, output_root=_new_run_directory())
+        ).run(source, output_root=run_directory)
     except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))
     return 0
@@ -74,9 +80,66 @@ def _base_filename(value: str) -> str:
     return value
 
 
-def _new_run_directory() -> Path:
-    timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S-%fZ")
-    return OUTPUT_ROOT / timestamp
+def _new_run_directory(*, source: str, vlm: str) -> Path:
+    revision = _effective_revision()
+    timestamp = int(time.time())
+    return OUTPUT_ROOT / f"{timestamp}-{revision}-{source}-{vlm}"
+
+
+def _effective_revision() -> str:
+    jj_error: str
+    try:
+        result = subprocess.run(
+            (
+                "jj",
+                "log",
+                "-r",
+                "@",
+                "--no-graph",
+                "-T",
+                "commit_id.short(8)",
+            ),
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError:
+        jj_error = "jj is not installed"
+    except subprocess.CalledProcessError as exc:
+        jj_error = exc.stderr.strip() or str(exc)
+    else:
+        revision = result.stdout.strip()
+        if re.fullmatch(r"[0-9a-f]{8}", revision):
+            return revision
+        jj_error = f"invalid revision {revision!r}"
+
+    print(f"[run] jj revision unavailable: {jj_error}. fallback=git")
+    try:
+        result = subprocess.run(
+            ("git", "rev-parse", "--verify", "HEAD"),
+            cwd=REPOSITORY_ROOT,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except FileNotFoundError as exc:
+        raise RuntimeError(
+            f"Run name has no revision. jj: {jj_error}. git is not installed"
+        ) from exc
+    except subprocess.CalledProcessError as exc:
+        git_error = exc.stderr.strip() or str(exc)
+        raise RuntimeError(
+            f"Run name has no revision. jj: {jj_error}. git: {git_error}"
+        ) from exc
+
+    revision = result.stdout.strip()
+    if not re.fullmatch(r"[0-9a-f]{40}|[0-9a-f]{64}", revision):
+        raise RuntimeError(
+            f"Run name has no revision. jj: {jj_error}. "
+            f"git returned an invalid revision: {revision!r}"
+        )
+    return revision[:7]
 
 
 if __name__ == "__main__":

@@ -24,3 +24,8 @@ av2 log frame="0" split="val":
 # Generate a scene graph for one video frame.
 video filename timestamp="0":
     uv run python -m src.main video "{{ filename }}" --timestamp "{{ timestamp }}"
+
+# Move all output runs into the archive.
+archive:
+    mkdir -p outputs/_archives
+    find outputs -mindepth 1 -maxdepth 1 -type d ! -name _archives -exec mv {} outputs/_archives/ \;
