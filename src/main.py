@@ -45,7 +45,7 @@ def main() -> int:
             "--model-config", type=Path, default=DEFAULT_MODEL_CONFIG
         )
         source_parser.add_argument(
-            "--relation-platform",
+            "--vlm-platform",
             help="VLM platform for road-layout and relation extraction",
         )
 
@@ -63,16 +63,13 @@ def main() -> int:
                 camera_frame_index=arguments.frame,
             )
         config = load_config(arguments.model_config)
-        relation_config = config.relation_extraction.select(
-            arguments.relation_platform
-        )
+        vlm_client = LiteLlmClient(config.select(arguments.vlm_platform))
         detector = GroundingDinoProClient()
-        relation_client = LiteLlmClient(relation_config)
         Pipeline(
             (
                 ObjectDetectionStage(detector),
-                RoadLayoutExtractionStage(relation_client),
-                RelationExtractionStage(relation_client),
+                RoadLayoutExtractionStage(vlm_client),
+                RelationExtractionStage(vlm_client),
             )
         ).run(source, output_root=output)
     except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:
