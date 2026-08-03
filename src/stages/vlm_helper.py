@@ -30,15 +30,21 @@ def render_identity_map(frame: Frame) -> bytes:
     )
 
 
+def build_original_vlm_image(frame: Frame) -> VlmImage:
+    """Build the original image for a VLM request."""
+
+    return VlmImage(
+        role="original",
+        data=frame.image.path.read_bytes(),
+        media_type=_image_media_type(frame.image.path.suffix),
+    )
+
+
 def build_vlm_images(frame: Frame, identity_map: bytes) -> tuple[VlmImage, ...]:
     """Build the original and identity-map images shared by VLM stages."""
 
     return (
-        VlmImage(
-            role="original",
-            data=frame.image.path.read_bytes(),
-            media_type=_image_media_type(frame.image.path.suffix),
-        ),
+        build_original_vlm_image(frame),
         VlmImage(
             role="identity_map",
             data=identity_map,
@@ -67,7 +73,11 @@ def parse_vlm_json(text: str) -> JsonValue:
         ) from exc
 
 
-def build_request_trace(response: VlmResponse) -> dict[str, JsonValue]:
+def build_request_trace(
+    response: VlmResponse,
+    *,
+    image_roles: tuple[str, ...] = ("original", "identity_map"),
+) -> dict[str, JsonValue]:
     """Build the shared request manifest for a completed VLM call."""
 
     trace = dict(response.request or {})
@@ -77,7 +87,7 @@ def build_request_trace(response: VlmResponse) -> dict[str, JsonValue]:
             {
                 "transport": "unspecified",
                 "model": response.model,
-                "images": ["original", "identity_map"],
+                "images": list(image_roles),
             }
         )
     return trace

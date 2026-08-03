@@ -72,6 +72,32 @@ class LinkMLMeta(RootModel):
 
 linkml_meta = None
 
+class WeatherCondition(str, Enum):
+    """
+    A visible atmospheric condition expressed as one adjective.
+    """
+    clear = "clear"
+    """
+    The atmosphere has no visible precipitation, fog, or substantial cloud cover.
+    """
+    cloudy = "cloudy"
+    """
+    Clouds substantially cover the visible sky.
+    """
+    rainy = "rainy"
+    """
+    Rain is visibly present in the scene.
+    """
+    snowy = "snowy"
+    """
+    Snowfall is visibly present in the scene.
+    """
+    foggy = "foggy"
+    """
+    Fog visibly reduces atmospheric visibility.
+    """
+
+
 class RoadUserDecision(str, Enum):
     """
     A decision bundled into a perceived road-user record.
@@ -407,6 +433,7 @@ class Scene(ConfiguredBaseModel):
     timestamp_ns: Optional[int] = Field(default=None, description="""Optional source timestamp in nanoseconds.""", ge=0)
     provenance: list[Provenance] = Field(default=..., description="""Sources that contributed the frame represented by this scene.""")
     ego: EgoVehicle = Field(default=..., description="""The observing vehicle, which is not represented by an image bounding box.""")
+    weather: Optional[WeatherCondition] = Field(default=None, description="""Visible atmospheric condition for this scene.""")
     road_users: Optional[list[Annotated[Union[Bus,Car,Cyclist,Motorcycle,Pedestrian,SchoolBus,Truck], Field(discriminator="type")]]] = Field(default=None, description="""Road users perceived in the frame, excluding ego.""")
     road_regions: Optional[list[Annotated[Union[Intersection,Lane], Field(discriminator="type")]]] = Field(default=None, description="""Road regions perceived in the frame.""")
     states: Optional[list[StopArmState]] = Field(default=None, description="""States observed on perceived road users in this frame.""")

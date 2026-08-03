@@ -15,6 +15,7 @@ default_range: string
 imports:
   - linkml:types
   - common
+  - weather
   - states
   - road_users
   - road_regions
@@ -45,6 +46,9 @@ classes:
         range: EgoVehicle
         inlined: true
         required: true
+      weather:
+        description: Visible atmospheric condition for this scene.
+        range: WeatherCondition
       road_users:
         description: Road users perceived in the frame, excluding ego.
         range: PerceivedRoadUser

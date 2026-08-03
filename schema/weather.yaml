@@ -1,0 +1,29 @@
+id: https://w3id.org/sgg-vlm/schema/weather
+name: sgg_vlm_weather
+version: 0.1.0
+description: Visible weather conditions supported by the sgg-vlm scene graph.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sggvlm: https://w3id.org/sgg-vlm/
+
+default_prefix: sggvlm
+default_range: string
+
+imports:
+  - linkml:types
+
+enums:
+  WeatherCondition:
+    description: A visible atmospheric condition expressed as one adjective.
+    permissible_values:
+      clear:
+        description: The atmosphere has no visible precipitation, fog, or substantial cloud cover.
+      cloudy:
+        description: Clouds substantially cover the visible sky.
+      rainy:
+        description: Rain is visibly present in the scene.
+      snowy:
+        description: Snowfall is visibly present in the scene.
+      foggy:
+        description: Fog visibly reduces atmospheric visibility.

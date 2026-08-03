@@ -10,6 +10,7 @@ from src.graph._generated.models import (
     Relationship,
     RoadRegion,
     Scene,
+    WeatherCondition,
 )
 from src.traces import Trace
 
@@ -22,6 +23,7 @@ class StageOutput:
     road_regions: tuple[RoadRegion, ...] = ()
     relationships: tuple[Relationship, ...] = ()
     states: tuple[ObjectState, ...] = ()
+    weather: WeatherCondition | None = None
     traces: tuple[Trace, ...] = ()
 
 
@@ -35,6 +37,8 @@ def apply_stage_output(graph: Scene, output: StageOutput) -> Scene:
         relationships=[*(graph.relationships or []), *output.relationships],
         states=[*(graph.states or []), *output.states],
     )
+    if output.weather is not None:
+        payload["weather"] = output.weather
     return Scene.model_validate(payload)
 
 

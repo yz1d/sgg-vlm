@@ -12,6 +12,7 @@ from src.stages import (
     ObjectDetectionStage,
     RelationExtractionStage,
     RoadLayoutExtractionStage,
+    WeatherExtractionStage,
 )
 
 DEFAULT_AV2_ROOT = Path("inputs/av2/sensor")
@@ -70,6 +71,7 @@ def main() -> int:
                 ObjectDetectionStage(detector),
                 RoadLayoutExtractionStage(vlm_client),
                 RelationExtractionStage(vlm_client),
+                WeatherExtractionStage(vlm_client),
             )
         ).run(source, output_root=output)
     except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:

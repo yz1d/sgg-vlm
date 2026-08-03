@@ -33,9 +33,13 @@ def graph_to_dot(graph: Scene) -> str:
         digest = hashlib.sha256(type_name.encode("utf-8")).digest()
         return palette[int.from_bytes(digest[:2], "big") % len(palette)]
 
+    graph_label = graph.frame_id
+    if graph.weather is not None:
+        graph_label += f"\nweather: {graph.weather}"
+
     lines = [
         "digraph scene_graph {",
-        f"  graph [label={quoted(graph.frame_id)}, labelloc=t, rankdir=TB, "
+        f"  graph [label={quoted(graph_label)}, labelloc=t, rankdir=TB, "
         'bgcolor="white", pad=0.25, nodesep=0.45, ranksep=0.8, '
         "splines=true, outputorder=edgesfirst];",
         '  node [shape=ellipse, style=filled, color="black", penwidth=1.2, '
