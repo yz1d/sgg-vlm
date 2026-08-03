@@ -131,12 +131,15 @@ def render_graphviz(graph: Scene) -> bytes:
     dot = shutil.which("dot")
     if dot is None:
         raise GraphvizError("Graphviz 'dot' executable is required")
-    result = subprocess.run(
-        [dot, "-Tpng"],
-        input=graph_to_dot(graph).encode("utf-8"),
-        capture_output=True,
-        check=False,
-    )
+    try:
+        result = subprocess.run(
+            [dot, "-Tpng"],
+            input=graph_to_dot(graph).encode("utf-8"),
+            capture_output=True,
+            check=False,
+        )
+    except OSError as exc:
+        raise GraphvizError(f"Graphviz execution failed: {exc}") from exc
     if result.returncode != 0:
         message = result.stderr.decode("utf-8", errors="replace").strip()
         raise GraphvizError(message or "Graphviz rendering failed")

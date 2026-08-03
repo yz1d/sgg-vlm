@@ -9,7 +9,7 @@ from typing import Sequence
 
 from src.frame import Frame, Image
 from src.graph._generated.models import Scene
-from src.graph.render import render_graphviz
+from src.graph.render import GraphvizError, render_graphviz
 from src.graph.validation import validate_scene
 from src.inputs.base import InputContext, InputSource
 from src.stage import Stage, apply_stage_output
@@ -100,15 +100,22 @@ class Pipeline:
         try:
             graph_path = temporary / "graph.json"
             _write_graph(graph_path, graph)
-            serialized_graph = Scene.model_validate_json(graph_path.read_bytes())
-            stage_traces = (
-                *traces,
-                Trace.bytes(
-                    "graph.png",
-                    render_graphviz(serialized_graph),
-                    media_type="image/png",
-                ),
-            )
+            stage_traces = list(traces)
+            try:
+                graph_png = render_graphviz(graph)
+            except GraphvizError as exc:
+                print(
+                    f"[pipeline] graph render skipped: "
+                    f"stage={destination.name} error={exc}"
+                )
+            else:
+                stage_traces.append(
+                    Trace.bytes(
+                        "graph.png",
+                        graph_png,
+                        media_type="image/png",
+                    )
+                )
             self.trace_store.publish(temporary, stage_traces)
             if image is not None:
                 source, name = image
