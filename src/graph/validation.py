@@ -60,6 +60,14 @@ def validate_scene(graph: Scene) -> None:
     relationship_ids = [relationship.id for relationship in relationships]
     if len(relationship_ids) != len(set(relationship_ids)):
         raise GraphValidationError("Relationship IDs must be unique")
+    relationship_keys = [
+        (relationship.subject, relationship.type, relationship.object)
+        for relationship in relationships
+    ]
+    if len(relationship_keys) != len(set(relationship_keys)):
+        raise GraphValidationError(
+            "Relationships must be unique by subject, type, and object"
+        )
     entity_by_id = {
         "ego": graph.ego,
         **road_user_by_id,

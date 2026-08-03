@@ -8,12 +8,11 @@ from pathlib import Path
 from typing import Sequence
 
 from src.frame import Frame, Image
-from src.graph.apply import DefaultGraphChangeApplier, GraphChangeApplier
 from src.graph._generated.models import Scene
 from src.graph.render import render_graphviz
 from src.graph.validation import validate_scene
 from src.inputs.base import InputContext, InputSource
-from src.stage import Stage
+from src.stage import Stage, apply_stage_output
 from src.traces import FileTraceStore, Trace, TraceStore
 
 
@@ -24,11 +23,9 @@ class Pipeline:
         self,
         stages: Sequence[Stage] = (),
         *,
-        change_applier: GraphChangeApplier | None = None,
         trace_store: TraceStore | None = None,
     ) -> None:
         self.stages = tuple(stages)
-        self.change_applier = change_applier or DefaultGraphChangeApplier()
         self.trace_store = trace_store or FileTraceStore()
         for stage in self.stages:
             if not re.fullmatch(r"[a-z][a-z0-9-]*", stage.name):
@@ -69,15 +66,7 @@ class Pipeline:
             print(f"[pipeline] stage started: {label}")
             try:
                 output = stage.run(current)
-                for change in output.changes:
-                    if not isinstance(change, stage.allowed_changes):
-                        raise ValueError(
-                            f"Stage {stage.name} cannot produce "
-                            f"{type(change).__name__}"
-                        )
-                graph = self.change_applier.apply(
-                    current.graph, output.changes
-                )
+                graph = apply_stage_output(current.graph, output)
                 validate_scene(graph)
                 self._publish_stage(
                     frame_directory / label,

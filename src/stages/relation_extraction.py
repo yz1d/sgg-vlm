@@ -9,8 +9,7 @@ from pydantic import BaseModel, ConfigDict
 from src.clients.vlm import VlmClient, VlmImage, VlmRequest
 from src.frame import Frame
 from src.graph._generated.catalog import RELATIONSHIP_TARGETS, STATE_TARGETS
-from src.graph._generated.models import Provenance
-from src.graph.changes import AddObjectState, AddRelationship
+from src.graph._generated.models import ObjectState, Provenance, Relationship
 from src.graph.ontology import RelationshipTarget, StateTarget
 from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
@@ -43,7 +42,6 @@ class RelationExtractionStage:
     """Add schema-defined object-to-ego relationships and object states."""
 
     name = "relation-extraction"
-    allowed_changes = (AddRelationship, AddObjectState)
 
     def __init__(self, client: VlmClient) -> None:
         self.client = client
@@ -137,7 +135,8 @@ class RelationExtractionStage:
             relationship.id for relationship in frame.graph.relationships or []
         }
         relationship_index = 1
-        changes: list[AddRelationship | AddObjectState] = []
+        relationships: list[Relationship] = []
+        states: list[ObjectState] = []
         normalized_relationships: list[JsonValue] = []
         for proposal in proposals.relationships:
             while f"relationship_{relationship_index:03d}" in used_relationship_ids:
@@ -160,7 +159,7 @@ class RelationExtractionStage:
                     ],
                 }
             )
-            changes.append(AddRelationship(relationship))
+            relationships.append(relationship)
             normalized_relationships.append(
                 cast(
                     JsonValue,
@@ -184,7 +183,7 @@ class RelationExtractionStage:
                     **proposal.attributes,
                 }
             )
-            changes.append(AddObjectState(state))
+            states.append(state)
             normalized_states.append(
                 cast(JsonValue, state.model_dump(mode="json", exclude_none=True))
             )
@@ -200,7 +199,8 @@ class RelationExtractionStage:
                 }
             )
         return StageOutput(
-            changes=tuple(changes),
+            relationships=tuple(relationships),
+            states=tuple(states),
             traces=(
                 Trace.text("prompt.txt", prompt),
                 Trace.json("stage-input.json", stage_input),

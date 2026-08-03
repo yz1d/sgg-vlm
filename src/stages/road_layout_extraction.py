@@ -8,8 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from src.clients.vlm import VlmClient, VlmImage, VlmRequest
 from src.frame import Frame
 from src.graph._generated.catalog import ROAD_REGION_TARGETS
-from src.graph._generated.models import Provenance, Relationship
-from src.graph.changes import AddRelationship, AddRoadRegion
+from src.graph._generated.models import Provenance, Relationship, RoadRegion
 from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
 from src.traces import JsonValue, Trace
@@ -32,7 +31,6 @@ class RoadLayoutExtractionStage:
     """Add occupied road regions and ego-relevant traffic-flow facts."""
 
     name = "road-layout-extraction"
-    allowed_changes = (AddRoadRegion, AddRelationship)
 
     def __init__(self, client: VlmClient) -> None:
         self.client = client
@@ -108,7 +106,8 @@ class RoadLayoutExtractionStage:
             road_region.id for road_region in frame.graph.road_regions or []
         }
         next_region_index = {name: 1 for name in target_by_name}
-        changes: list[AddRoadRegion | AddRelationship] = []
+        road_regions: list[RoadRegion] = []
+        relationships: list[Relationship] = []
         relationship_specs: list[tuple[type[Relationship], str, str]] = []
         normalized_regions: list[JsonValue] = []
 
@@ -134,7 +133,7 @@ class RoadLayoutExtractionStage:
                     ],
                 }
             )
-            changes.append(AddRoadRegion(road_region))
+            road_regions.append(road_region)
             normalized_regions.append(
                 cast(
                     JsonValue,
@@ -172,7 +171,7 @@ class RoadLayoutExtractionStage:
                     ],
                 }
             )
-            changes.append(AddRelationship(relationship))
+            relationships.append(relationship)
             normalized_relationships.append(
                 cast(
                     JsonValue,
@@ -191,7 +190,8 @@ class RoadLayoutExtractionStage:
                 }
             )
         return StageOutput(
-            changes=tuple(changes),
+            road_regions=tuple(road_regions),
+            relationships=tuple(relationships),
             traces=(
                 Trace.text("prompt.txt", prompt),
                 Trace.json("stage-input.json", stage_input),

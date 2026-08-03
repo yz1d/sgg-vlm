@@ -3,9 +3,9 @@ from __future__ import annotations
 from src.clients.object_detection import ObjectDetectionClient
 from src.frame import Frame
 from src.graph._generated.catalog import DETECTION_TARGETS
-from src.graph.changes import AddRoadUser
 from src.graph._generated.models import (
     BoundingBox2D,
+    PerceivedRoadUser,
     RoadUserDecision,
     RoadUserProvenance,
 )
@@ -18,7 +18,6 @@ class ObjectDetectionStage:
     """Add road users detected from the frame's primary image."""
 
     name = "object-detection"
-    allowed_changes = (AddRoadUser,)
 
     def __init__(self, client: ObjectDetectionClient) -> None:
         self.client = client
@@ -33,7 +32,7 @@ class ObjectDetectionStage:
 
         used_ids = {road_user.id for road_user in frame.graph.road_users or []}
         next_id = 1
-        changes: list[AddRoadUser] = []
+        road_users: list[PerceivedRoadUser] = []
         annotations: list[BoxAnnotation] = []
         normalized: list[JsonValue] = []
         for detection in batch.detections:
@@ -72,7 +71,7 @@ class ObjectDetectionStage:
                     "provenance": [provenance],
                 }
             )
-            changes.append(AddRoadUser(road_user))
+            road_users.append(road_user)
             annotations.append(
                 BoxAnnotation(
                     bbox_xyxy=detection.bbox_xyxy,
@@ -99,7 +98,7 @@ class ObjectDetectionStage:
             "prompts": list(prompts),
         }
         return StageOutput(
-            changes=tuple(changes),
+            road_users=tuple(road_users),
             traces=(
                 Trace.json("request.json", request),
                 Trace.json("response.raw.json", batch.raw_response),
