@@ -48,15 +48,8 @@ class VlmPlatformsConfig(BaseModel):
             )
         return self
 
-    def select(self, platform: str | None = None) -> VlmConfig:
-        name = platform or self.default_platform
-        try:
-            return self.platforms[name]
-        except KeyError as exc:
-            available = ", ".join(sorted(self.platforms))
-            raise ValueError(
-                f"Unknown VLM platform {name!r}; choose one of: {available}"
-            ) from exc
+    def select(self) -> VlmConfig:
+        return self.platforms[self.default_platform]
 
 
 def load_config(path: Path) -> VlmPlatformsConfig:

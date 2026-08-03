@@ -63,7 +63,6 @@ class Av2Source:
                     "source.json",
                     {
                         "kind": "av2_sensor",
-                        "dataset_root": str(self.log_directory.parent.parent),
                         "split": split,
                         "log_id": log_id,
                         "camera": FRONT_CAMERA,

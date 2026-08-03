@@ -12,7 +12,7 @@ import requests
 
 S3_ENDPOINT = "https://argoverse.s3.amazonaws.com"
 SENSOR_PREFIX = "datasets/av2/sensor"
-DEFAULT_DATASET_ROOT = Path("inputs/av2/sensor")
+DATASET_ROOT = Path(__file__).resolve().parents[1] / "inputs/av2/sensor"
 FRONT_CAMERA_PATH = "sensors/cameras/ring_front_center"
 REQUIRED_FILES = (
     "annotations.feather",
@@ -162,14 +162,13 @@ def download_log(
     log_id: str,
     *,
     split: str,
-    dataset_root: Path,
     workers: int,
 ) -> None:
     if workers < 1:
         raise ValueError("Worker count must be at least one")
     print(f"[av2:download] discovering log={log_id} split={split}")
     prefix, objects = discover_log(log_id, split)
-    destination = dataset_root / split / log_id
+    destination = DATASET_ROOT / split / log_id
     total_size = sum(item.size for item in objects)
     print(
         f"[av2:download] started files={len(objects)} "
@@ -207,8 +206,8 @@ def download_log(
     )
 
 
-def _is_downloaded(dataset_root: Path, split: str, log_id: str) -> bool:
-    log_directory = dataset_root / split / log_id
+def _is_downloaded(split: str, log_id: str) -> bool:
+    log_directory = DATASET_ROOT / split / log_id
     return all((log_directory / path).is_file() for path in REQUIRED_FILES) and any(
         (log_directory / FRONT_CAMERA_PATH).glob("*.jpg")
     )
@@ -231,9 +230,6 @@ def main() -> None:
         "log_id", nargs="?", help="AV2 log ID; a remote log is chosen randomly if omitted"
     )
     parser.add_argument("--split", choices=("train", "val"), default="val")
-    parser.add_argument(
-        "--dataset-root", type=Path, default=DEFAULT_DATASET_ROOT
-    )
     parser.add_argument("--workers", type=int, default=12)
     parser.add_argument(
         "--list", action="store_true", help="List available log IDs without downloading"
@@ -246,9 +242,7 @@ def main() -> None:
             for log_id in list_log_ids(arguments.split):
                 status = (
                     "downloaded"
-                    if _is_downloaded(
-                        arguments.dataset_root, arguments.split, log_id
-                    )
+                    if _is_downloaded(arguments.split, log_id)
                     else "remote"
                 )
                 print(f"{status:10} {log_id}")
@@ -259,9 +253,7 @@ def main() -> None:
             candidates = [
                 candidate
                 for candidate in list_log_ids(arguments.split)
-                if not _is_downloaded(
-                    arguments.dataset_root, arguments.split, candidate
-                )
+                if not _is_downloaded(arguments.split, candidate)
             ]
             if not candidates:
                 raise ValueError(
@@ -273,7 +265,6 @@ def main() -> None:
         download_log(
             log_id,
             split=arguments.split,
-            dataset_root=arguments.dataset_root,
             workers=arguments.workers,
         )
     except (OSError, ValueError, requests.RequestException) as exc:

@@ -15,10 +15,11 @@ from src.stages import (
     WeatherExtractionStage,
 )
 
-DEFAULT_AV2_ROOT = Path("inputs/av2/sensor")
-DEFAULT_VIDEO_ROOT = Path("inputs/videos")
-DEFAULT_OUTPUT_ROOT = Path("outputs")
-DEFAULT_MODEL_CONFIG = Path("models.yaml")
+REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
+AV2_ROOT = REPOSITORY_ROOT / "inputs/av2/sensor"
+VIDEO_ROOT = REPOSITORY_ROOT / "inputs/videos"
+OUTPUT_ROOT = REPOSITORY_ROOT / "outputs"
+MODEL_CONFIG = REPOSITORY_ROOT / "models.yaml"
 
 
 def main() -> int:
@@ -30,41 +31,28 @@ def main() -> int:
     )
     video.add_argument("filename", type=_base_filename)
     video.add_argument("--timestamp", type=float, default=0.0)
-    video.add_argument("--output", type=Path)
 
     av2 = subparsers.add_parser(
         "av2", help="Load one ring_front_center frame from an AV2 Sensor log"
     )
     av2.add_argument("log_id")
     av2.add_argument("--split", choices=("train", "val"), default="val")
-    av2.add_argument("--dataset-root", type=Path, default=DEFAULT_AV2_ROOT)
     av2.add_argument("--frame", type=int, default=0)
-    av2.add_argument("--output", type=Path)
-
-    for source_parser in (video, av2):
-        source_parser.add_argument(
-            "--model-config", type=Path, default=DEFAULT_MODEL_CONFIG
-        )
-        source_parser.add_argument(
-            "--vlm-platform",
-            help="VLM platform for road-layout and relation extraction",
-        )
 
     arguments = parser.parse_args()
-    output = arguments.output or _new_run_directory()
     try:
         if arguments.source == "video":
             source = VideoSource(
-                DEFAULT_VIDEO_ROOT / arguments.filename,
+                VIDEO_ROOT / arguments.filename,
                 timestamp_seconds=arguments.timestamp,
             )
         else:
             source = Av2Source(
-                arguments.dataset_root / arguments.split / arguments.log_id,
+                AV2_ROOT / arguments.split / arguments.log_id,
                 camera_frame_index=arguments.frame,
             )
-        config = load_config(arguments.model_config)
-        vlm_client = LiteLlmClient(config.select(arguments.vlm_platform))
+        config = load_config(MODEL_CONFIG)
+        vlm_client = LiteLlmClient(config.select())
         detector = GroundingDinoProClient()
         Pipeline(
             (
@@ -73,7 +61,7 @@ def main() -> int:
                 RelationExtractionStage(vlm_client),
                 WeatherExtractionStage(vlm_client),
             )
-        ).run(source, output_root=output)
+        ).run(source, output_root=_new_run_directory())
     except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:
         parser.error(str(exc))
     return 0
@@ -88,7 +76,7 @@ def _base_filename(value: str) -> str:
 
 def _new_run_directory() -> Path:
     timestamp = datetime.now(UTC).strftime("%Y-%m-%dT%H-%M-%S-%fZ")
-    return DEFAULT_OUTPUT_ROOT / timestamp
+    return OUTPUT_ROOT / timestamp
 
 
 if __name__ == "__main__":
