@@ -5,12 +5,17 @@ from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from src.clients.vlm import VlmClient, VlmImage, VlmRequest
+from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
 from src.graph._generated.catalog import ROAD_REGION_TARGETS
 from src.graph._generated.models import Provenance, Relationship, RoadRegion
-from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
+from src.stages.vlm_helper import (
+    build_request_trace,
+    build_vlm_images,
+    parse_vlm_json,
+    render_identity_map,
+)
 from src.traces import JsonValue, Trace
 
 
@@ -37,22 +42,7 @@ class RoadLayoutExtractionStage:
 
     def run(self, frame: Frame) -> StageOutput:
         road_users = list(frame.graph.road_users or [])
-        identity_map = render_box_overlay(
-            frame.image,
-            [
-                BoxAnnotation(
-                    bbox_xyxy=(
-                        road_user.bbox.x_min,
-                        road_user.bbox.y_min,
-                        road_user.bbox.x_max,
-                        road_user.bbox.y_max,
-                    ),
-                    text=road_user.id,
-                    color_key=road_user.type,
-                )
-                for road_user in road_users
-            ],
-        )
+        identity_map = render_identity_map(frame)
         registry: list[JsonValue] = [
             {"id": "ego", "type": "EgoVehicle"},
             *(
@@ -80,22 +70,13 @@ class RoadLayoutExtractionStage:
         response = self.client.complete(
             VlmRequest(
                 prompt=prompt,
-                images=(
-                    VlmImage(
-                        role="original",
-                        data=frame.image.path.read_bytes(),
-                        media_type=_image_media_type(frame.image.path.suffix),
-                    ),
-                    VlmImage(
-                        role="identity_map",
-                        data=identity_map,
-                        media_type="image/png",
-                    ),
-                ),
+                images=build_vlm_images(frame, identity_map),
                 response_schema=_response_schema(tuple(target_by_name)),
             )
         )
-        proposals = RoadLayoutResponse.model_validate(_parse_json(response.text))
+        proposals = RoadLayoutResponse.model_validate(
+            parse_vlm_json(response.text)
+        )
         _validate_proposals(
             proposals,
             known_subjects={"ego", *(road_user.id for road_user in road_users)},
@@ -179,16 +160,7 @@ class RoadLayoutExtractionStage:
                 )
             )
 
-        request_trace = dict(response.request or {})
-        request_trace["prompt"] = "prompt.txt"
-        if response.request is None:
-            request_trace.update(
-                {
-                    "transport": "unspecified",
-                    "model": response.model,
-                    "images": ["original", "identity_map"],
-                }
-            )
+        request_trace = build_request_trace(response)
         return StageOutput(
             road_regions=tuple(road_regions),
             relationships=tuple(relationships),
@@ -254,35 +226,3 @@ def _response_schema(region_types: tuple[str, ...]) -> dict[str, JsonValue]:
     type_schema = cast(dict[str, Any], properties["type"])
     type_schema["enum"] = list(region_types)
     return cast(dict[str, JsonValue], schema)
-
-
-def _parse_json(text: str) -> JsonValue:
-    stripped = text.strip()
-    if not stripped:
-        raise ValueError("VLM response text is empty")
-    if stripped.startswith("```") and stripped.endswith("```"):
-        lines = stripped.splitlines()
-        if len(lines) >= 3:
-            stripped = "\n".join(lines[1:-1])
-    try:
-        return cast(JsonValue, json.loads(stripped))
-    except json.JSONDecodeError as exc:
-        preview = stripped[:200].replace("\n", "\\n")
-        raise ValueError(
-            f"VLM response is not valid JSON: {exc}. Response starts with "
-            f"{preview!r}"
-        ) from exc
-
-
-def _image_media_type(suffix: str) -> str:
-    media_types = {
-        ".gif": "image/gif",
-        ".jpeg": "image/jpeg",
-        ".jpg": "image/jpeg",
-        ".png": "image/png",
-        ".webp": "image/webp",
-    }
-    try:
-        return media_types[suffix.lower()]
-    except KeyError as exc:
-        raise ValueError(f"Unsupported VLM image format: {suffix or '<none>'}") from exc

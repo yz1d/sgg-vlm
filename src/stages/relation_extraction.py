@@ -6,13 +6,18 @@ from typing import cast
 
 from pydantic import BaseModel, ConfigDict
 
-from src.clients.vlm import VlmClient, VlmImage, VlmRequest
+from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
 from src.graph._generated.catalog import RELATIONSHIP_TARGETS, STATE_TARGETS
 from src.graph._generated.models import ObjectState, Provenance, Relationship
 from src.graph.ontology import RelationshipTarget, StateTarget
-from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
+from src.stages.vlm_helper import (
+    build_request_trace,
+    build_vlm_images,
+    parse_vlm_json,
+    render_identity_map,
+)
 from src.traces import JsonValue, Trace
 
 
@@ -52,22 +57,7 @@ class RelationExtractionStage:
             target for target in RELATIONSHIP_TARGETS if target.extraction_enabled
         )
         state_vocabulary = STATE_TARGETS
-        identity_map = render_box_overlay(
-            frame.image,
-            [
-                BoxAnnotation(
-                    bbox_xyxy=(
-                        road_user.bbox.x_min,
-                        road_user.bbox.y_min,
-                        road_user.bbox.x_max,
-                        road_user.bbox.y_max,
-                    ),
-                    text=road_user.id,
-                    color_key=road_user.type,
-                )
-                for road_user in road_users
-            ],
-        )
+        identity_map = render_identity_map(frame)
         registry: list[JsonValue] = [
             {"id": road_user.id, "type": road_user.type}
             for road_user in road_users
@@ -98,25 +88,16 @@ class RelationExtractionStage:
         response = self.client.complete(
             VlmRequest(
                 prompt=prompt,
-                images=(
-                    VlmImage(
-                        role="original",
-                        data=frame.image.path.read_bytes(),
-                        media_type=_image_media_type(frame.image.path.suffix),
-                    ),
-                    VlmImage(
-                        role="identity_map",
-                        data=identity_map,
-                        media_type="image/png",
-                    ),
-                ),
+                images=build_vlm_images(frame, identity_map),
                 response_schema=cast(
                     dict[str, JsonValue],
                     ExtractionResponse.model_json_schema(),
                 ),
             )
         )
-        proposals = ExtractionResponse.model_validate(_parse_json(response.text))
+        proposals = ExtractionResponse.model_validate(
+            parse_vlm_json(response.text)
+        )
         road_user_by_id = {road_user.id: road_user for road_user in road_users}
         relationship_by_name = {
             target.model.__name__: target for target in relationship_vocabulary
@@ -188,16 +169,7 @@ class RelationExtractionStage:
                 cast(JsonValue, state.model_dump(mode="json", exclude_none=True))
             )
 
-        request_trace = dict(response.request or {})
-        request_trace["prompt"] = "prompt.txt"
-        if response.request is None:
-            request_trace.update(
-                {
-                    "transport": "unspecified",
-                    "model": response.model,
-                    "images": ["original", "identity_map"],
-                }
-            )
+        request_trace = build_request_trace(response)
         return StageOutput(
             relationships=tuple(relationships),
             states=tuple(states),
@@ -332,29 +304,3 @@ def _validate_proposals(
                 raise ValueError(
                     f"Invalid value for {proposal.type}.{name}: {value!r}"
                 )
-
-
-def _parse_json(text: str) -> JsonValue:
-    stripped = text.strip()
-    if stripped.startswith("```") and stripped.endswith("```"):
-        lines = stripped.splitlines()
-        if len(lines) >= 3:
-            stripped = "\n".join(lines[1:-1])
-    try:
-        return cast(JsonValue, json.loads(stripped))
-    except json.JSONDecodeError as exc:
-        raise ValueError(f"VLM response is not valid JSON: {exc}") from exc
-
-
-def _image_media_type(suffix: str) -> str:
-    media_types = {
-        ".gif": "image/gif",
-        ".jpeg": "image/jpeg",
-        ".jpg": "image/jpeg",
-        ".png": "image/png",
-        ".webp": "image/webp",
-    }
-    try:
-        return media_types[suffix.lower()]
-    except KeyError as exc:
-        raise ValueError(f"Unsupported VLM image format: {suffix or '<none>'}") from exc
