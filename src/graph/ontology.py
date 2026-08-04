@@ -4,23 +4,25 @@ from dataclasses import dataclass
 
 from src.graph._generated.models import (
     ObjectState,
+    PerceivedRoadEntity,
     PerceivedRoadUser,
     Relationship,
+    RoadEntity,
     RoadRegion,
-    RoadUser,
 )
 
 
+type PerceivedEntityModel = type[PerceivedRoadEntity]
 type RoadUserModel = type[PerceivedRoadUser]
 type RoadRegionModel = type[RoadRegion]
 type RelationshipModel = type[Relationship]
 type ObjectStateModel = type[ObjectState]
-type EntityModel = type[RoadUser] | type[RoadRegion]
+type EntityModel = type[RoadEntity] | type[RoadRegion]
 
 
 @dataclass(frozen=True, slots=True)
 class DetectionTarget:
-    model: RoadUserModel
+    model: PerceivedEntityModel
     prompt: str
 
 

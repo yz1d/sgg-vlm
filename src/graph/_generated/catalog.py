@@ -17,9 +17,10 @@ from src.graph._generated.models import (
     LeftOf,
     Motorcycle,
     Pedestrian,
-    PerceivedRoadUser,
+    PerceivedRoadEntity,
     RightOf,
-    RoadUser,
+    RoadBlockage,
+    RoadEntity,
     SchoolBus,
     StopArmState,
     Truck,
@@ -35,6 +36,10 @@ from src.graph.ontology import (
 
 
 DETECTION_TARGETS = (
+    DetectionTarget(
+        model=RoadBlockage,
+        prompt='blocked road area',
+    ),
     DetectionTarget(
         model=Bus,
         prompt='bus',
@@ -86,7 +91,7 @@ RELATIONSHIP_TARGETS = (
     RelationshipTarget(
         model=Behind,
         description="The subject is longitudinally behind ego in road coordinates, regardless of the subject's facing or motion direction.",
-        subject_model=PerceivedRoadUser,
+        subject_model=PerceivedRoadEntity,
         object_model=EgoVehicle,
         exclusive_group='longitudinal',
         extraction_enabled=True,
@@ -94,7 +99,7 @@ RELATIONSHIP_TARGETS = (
     RelationshipTarget(
         model=InFrontOf,
         description="The subject is longitudinally ahead of ego in road coordinates, regardless of the subject's facing or motion direction.",
-        subject_model=PerceivedRoadUser,
+        subject_model=PerceivedRoadEntity,
         object_model=EgoVehicle,
         exclusive_group='longitudinal',
         extraction_enabled=True,
@@ -102,7 +107,7 @@ RELATIONSHIP_TARGETS = (
     RelationshipTarget(
         model=InIntersection,
         description="The subject's ground reference point lies in the intersection.",
-        subject_model=RoadUser,
+        subject_model=RoadEntity,
         object_model=Intersection,
         exclusive_group='intersection_membership',
         extraction_enabled=False,
@@ -110,7 +115,7 @@ RELATIONSHIP_TARGETS = (
     RelationshipTarget(
         model=InLane,
         description="The subject's ground reference point lies in the lane.",
-        subject_model=RoadUser,
+        subject_model=RoadEntity,
         object_model=Lane,
         exclusive_group='lane_membership',
         extraction_enabled=False,
@@ -118,7 +123,7 @@ RELATIONSHIP_TARGETS = (
     RelationshipTarget(
         model=LeftOf,
         description="The subject is laterally left of ego relative to ego's road heading, not merely in the left half of the image.",
-        subject_model=PerceivedRoadUser,
+        subject_model=PerceivedRoadEntity,
         object_model=EgoVehicle,
         exclusive_group='lateral',
         extraction_enabled=True,
@@ -126,7 +131,7 @@ RELATIONSHIP_TARGETS = (
     RelationshipTarget(
         model=RightOf,
         description="The subject is laterally right of ego relative to ego's road heading, not merely in the right half of the image.",
-        subject_model=PerceivedRoadUser,
+        subject_model=PerceivedRoadEntity,
         object_model=EgoVehicle,
         exclusive_group='lateral',
         extraction_enabled=True,

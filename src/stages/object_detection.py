@@ -9,9 +9,9 @@ from src.frame import Frame
 from src.graph._generated.catalog import DETECTION_TARGETS
 from src.graph._generated.models import (
     BoundingBox2D,
-    PerceivedRoadUser,
-    RoadUserDecision,
-    RoadUserProvenance,
+    PerceivedEntityDecision,
+    PerceivedEntityProvenance,
+    PerceivedRoadEntity,
 )
 from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
@@ -19,7 +19,7 @@ from src.traces import JsonValue, Trace
 
 
 class ObjectDetectionStage:
-    """Add road users detected from the frame's primary image."""
+    """Add road entities detected from the frame's primary image."""
 
     name = "object-detection"
 
@@ -44,9 +44,11 @@ class ObjectDetectionStage:
         with PillowImage.open(frame.image.path) as image:
             image_width, image_height = image.size
 
-        used_ids = {road_user.id for road_user in frame.graph.road_users or []}
+        used_ids = {
+            entity.id for entity in frame.graph.perceived_entities or []
+        }
         next_id = 1
-        road_users: list[PerceivedRoadUser] = []
+        perceived_entities: list[PerceivedRoadEntity] = []
         annotations: list[BoxAnnotation] = []
         normalized: list[JsonValue] = []
         filtered: list[JsonValue] = []
@@ -89,26 +91,26 @@ class ObjectDetectionStage:
                 )
                 continue
 
-            while f"road_user_{next_id:03d}" in used_ids:
+            while f"entity_{next_id:03d}" in used_ids:
                 next_id += 1
-            road_user_id = f"road_user_{next_id:03d}"
-            used_ids.add(road_user_id)
+            entity_id = f"entity_{next_id:03d}"
+            used_ids.add(entity_id)
             next_id += 1
 
-            provenance = RoadUserProvenance(
+            provenance = PerceivedEntityProvenance(
                 source="object-detection",
                 stage=self.name,
                 model=batch.model,
                 source_confidence=detection.confidence,
                 supports=[
-                    RoadUserDecision.existence,
-                    RoadUserDecision.classification,
-                    RoadUserDecision.bounding_box,
+                    PerceivedEntityDecision.existence,
+                    PerceivedEntityDecision.classification,
+                    PerceivedEntityDecision.bounding_box,
                 ],
             )
-            road_user = target.model.model_validate(
+            entity = target.model.model_validate(
                 {
-                    "id": road_user_id,
+                    "id": entity_id,
                     "bbox": BoundingBox2D(
                         x_min=bbox[0],
                         y_min=bbox[1],
@@ -118,25 +120,25 @@ class ObjectDetectionStage:
                     "provenance": [provenance],
                 }
             )
-            road_users.append(road_user)
+            perceived_entities.append(entity)
             annotations.append(
                 BoxAnnotation(
                     bbox_xyxy=bbox,
                     text=(
-                        f"{road_user_id} {road_user.type}"
+                        f"{entity_id} {entity.type}"
                         + (
                             f" {detection.confidence:.2f}"
                             if detection.confidence is not None
                             else ""
                         )
                     ),
-                    color_key=road_user.type,
+                    color_key=entity.type,
                 )
             )
             normalized.append(
                 {
-                    "road_user_id": road_user_id,
-                    "type": road_user.type,
+                    "entity_id": entity_id,
+                    "type": entity.type,
                     "label": detection.label,
                     "bbox_xyxy": list(bbox),
                     "area_ratio": area_ratio,
@@ -166,7 +168,7 @@ class ObjectDetectionStage:
             }
         )
         return StageOutput(
-            road_users=tuple(road_users),
+            perceived_entities=tuple(perceived_entities),
             traces=(
                 Trace.json("request.json", request),
                 Trace.json("response.raw.json", batch.raw_response),

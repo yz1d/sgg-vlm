@@ -6,7 +6,7 @@ from typing import Protocol
 from src.frame import Frame
 from src.graph._generated.models import (
     ObjectState,
-    PerceivedRoadUser,
+    PerceivedRoadEntity,
     Relationship,
     RoadRegion,
     Scene,
@@ -19,7 +19,7 @@ from src.traces import Trace
 class StageOutput:
     """Graph additions and non-semantic traces produced by one stage."""
 
-    road_users: tuple[PerceivedRoadUser, ...] = ()
+    perceived_entities: tuple[PerceivedRoadEntity, ...] = ()
     road_regions: tuple[RoadRegion, ...] = ()
     relationships: tuple[Relationship, ...] = ()
     states: tuple[ObjectState, ...] = ()
@@ -32,7 +32,10 @@ def apply_stage_output(graph: Scene, output: StageOutput) -> Scene:
 
     payload = graph.model_dump(mode="python")
     payload.update(
-        road_users=[*(graph.road_users or []), *output.road_users],
+        perceived_entities=[
+            *(graph.perceived_entities or []),
+            *output.perceived_entities,
+        ],
         road_regions=[*(graph.road_regions or []), *output.road_regions],
         relationships=[*(graph.relationships or []), *output.relationships],
         states=[*(graph.states or []), *output.states],

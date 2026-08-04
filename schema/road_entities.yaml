@@ -1,7 +1,7 @@
-id: https://w3id.org/sgg-vlm/schema/road-users
-name: sgg_vlm_road_users
+id: https://w3id.org/sgg-vlm/schema/road-entities
+name: sgg_vlm_road_entities
 version: 0.1.0
-description: Road-user types supported by the sgg-vlm scene graph.
+description: Perceived entity types supported by the sgg-vlm scene graph.
 
 prefixes:
   linkml: https://w3id.org/linkml/
@@ -14,34 +14,34 @@ imports:
   - common
 
 classes:
-  RoadUserProvenance:
-    description: Provenance identifying the parts of a perceived road-user record supported by a source.
+  PerceivedEntityProvenance:
+    description: Provenance identifying the parts of a perceived entity record supported by a source.
     is_a: Provenance
     attributes:
       supports:
-        description: Decisions in the road-user record supported by this source.
-        range: RoadUserDecision
+        description: Decisions in the perceived entity record supported by this source.
+        range: PerceivedEntityDecision
         multivalued: true
         required: true
 
-  RoadUser:
-    description: A traffic participant represented in the scene graph.
+  RoadEntity:
+    description: An entity that occupies or affects road space in the scene.
     abstract: true
     attributes:
       id:
-        description: Identity used to reference this road user within the scene.
+        description: Identity used to reference this road entity within the scene.
         identifier: true
         range: string
         required: true
       type:
-        description: Concrete LinkML class of this road user.
+        description: Concrete LinkML class of this road entity.
         designates_type: true
         range: string
         required: true
 
   EgoVehicle:
     description: The observing vehicle and reference frame for spatial relationships.
-    is_a: RoadUser
+    is_a: RoadEntity
     slot_usage:
       id:
         equals_string: ego
@@ -53,9 +53,9 @@ classes:
         inlined_as_list: true
         required: true
 
-  PerceivedRoadUser:
-    description: A non-ego road user localized in the input image.
-    is_a: RoadUser
+  PerceivedRoadEntity:
+    description: A non-ego road entity localized in the input image.
+    is_a: RoadEntity
     abstract: true
     attributes:
       bbox:
@@ -64,14 +64,25 @@ classes:
         inlined: true
         required: true
       track_id:
-        description: Optional cross-frame identity for the same physical road user.
+        description: Optional cross-frame identity for the same physical entity.
         range: string
       provenance:
         description: Sources supporting the existence, classification, bounding box, or tracking decisions.
-        range: RoadUserProvenance
+        range: PerceivedEntityProvenance
         multivalued: true
         inlined_as_list: true
         required: true
+
+  PerceivedRoadUser:
+    description: A perceived traffic participant localized in the input image.
+    is_a: PerceivedRoadEntity
+    abstract: true
+
+  RoadBlockage:
+    description: A contiguous visible road area unavailable for normal vehicle travel, independent of the objects or condition that causes it.
+    is_a: PerceivedRoadEntity
+    annotations:
+      object_detection_prompt: blocked road area
 
   Vehicle:
     description: An abstract perceived motor vehicle.
@@ -121,14 +132,14 @@ classes:
       object_detection_prompt: pedestrian
 
 enums:
-  RoadUserDecision:
-    description: A decision bundled into a perceived road-user record.
+  PerceivedEntityDecision:
+    description: A decision bundled into a perceived entity record.
     permissible_values:
       existence:
-        description: The road user exists in the scene.
+        description: The entity exists in the scene.
       classification:
-        description: The road user has the selected concrete type.
+        description: The entity has the selected concrete type.
       bounding_box:
-        description: The road user occupies the selected image bounding box.
+        description: The entity occupies the selected image bounding box.
       tracking:
-        description: The road user has the selected cross-frame track identity.
+        description: The entity has the selected cross-frame track identity.
