@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import math
+
+from PIL import Image as PillowImage
+
 from src.clients.object_detection import ObjectDetectionClient
 from src.frame import Frame
 from src.graph._generated.catalog import DETECTION_TARGETS
@@ -29,12 +33,16 @@ class ObjectDetectionStage:
         prompts = tuple(target.prompt for target in targets)
         target_by_prompt = {target.prompt.casefold(): target for target in targets}
         batch = self.client.detect(frame.image, prompts)
+        with PillowImage.open(frame.image.path) as image:
+            image_width, image_height = image.size
 
         used_ids = {road_user.id for road_user in frame.graph.road_users or []}
         next_id = 1
         road_users: list[PerceivedRoadUser] = []
         annotations: list[BoxAnnotation] = []
         normalized: list[JsonValue] = []
+        clipped_count = 0
+        discarded_count = 0
         for detection in batch.detections:
             target = target_by_prompt.get(detection.label.casefold())
             if target is None:
@@ -42,6 +50,17 @@ class ObjectDetectionStage:
                     f"Object-detection client returned an unrequested label: "
                     f"{detection.label!r}"
                 )
+            bbox = _clip_bbox(
+                detection.bbox_xyxy,
+                width=image_width,
+                height=image_height,
+            )
+            if bbox is None:
+                discarded_count += 1
+                continue
+            if bbox != detection.bbox_xyxy:
+                clipped_count += 1
+
             while f"road_user_{next_id:03d}" in used_ids:
                 next_id += 1
             road_user_id = f"road_user_{next_id:03d}"
@@ -63,10 +82,10 @@ class ObjectDetectionStage:
                 {
                     "id": road_user_id,
                     "bbox": BoundingBox2D(
-                        x_min=detection.bbox_xyxy[0],
-                        y_min=detection.bbox_xyxy[1],
-                        x_max=detection.bbox_xyxy[2],
-                        y_max=detection.bbox_xyxy[3],
+                        x_min=bbox[0],
+                        y_min=bbox[1],
+                        x_max=bbox[2],
+                        y_max=bbox[3],
                     ),
                     "provenance": [provenance],
                 }
@@ -74,7 +93,7 @@ class ObjectDetectionStage:
             road_users.append(road_user)
             annotations.append(
                 BoxAnnotation(
-                    bbox_xyxy=detection.bbox_xyxy,
+                    bbox_xyxy=bbox,
                     text=(
                         f"{road_user_id} {road_user.type} "
                         f"{detection.confidence:.2f}"
@@ -87,9 +106,16 @@ class ObjectDetectionStage:
                     "road_user_id": road_user_id,
                     "type": road_user.type,
                     "label": detection.label,
-                    "bbox_xyxy": list(detection.bbox_xyxy),
+                    "bbox_xyxy": list(bbox),
                     "confidence": detection.confidence,
                 }
+            )
+
+        if clipped_count or discarded_count:
+            print(
+                f"[object-detection] normalized boxes clipped={clipped_count} "
+                f"discarded={discarded_count} "
+                f"image={image_width}x{image_height}"
             )
 
         request: dict[str, JsonValue] = {
@@ -109,3 +135,20 @@ class ObjectDetectionStage:
                 ),
             ),
         )
+
+
+def _clip_bbox(
+    bbox: tuple[float, float, float, float],
+    *,
+    width: int,
+    height: int,
+) -> tuple[float, float, float, float] | None:
+    if not all(math.isfinite(coordinate) for coordinate in bbox):
+        return None
+    x_min = max(0.0, min(float(width), bbox[0]))
+    y_min = max(0.0, min(float(height), bbox[1]))
+    x_max = max(0.0, min(float(width), bbox[2]))
+    y_max = max(0.0, min(float(height), bbox[3]))
+    if x_min >= x_max or y_min >= y_max:
+        return None
+    return x_min, y_min, x_max, y_max
