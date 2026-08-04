@@ -1,3 +1,4 @@
+enable=clipboard
 add-dirs-ro=~/src/_archives/sgg-vlm.bak
 add-dirs-ro=~/src/_reading/scenario-extraction
 add-dirs=~/.data
