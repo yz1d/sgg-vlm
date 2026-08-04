@@ -95,8 +95,12 @@ class ObjectDetectionStage:
                 BoxAnnotation(
                     bbox_xyxy=bbox,
                     text=(
-                        f"{road_user_id} {road_user.type} "
-                        f"{detection.confidence:.2f}"
+                        f"{road_user_id} {road_user.type}"
+                        + (
+                            f" {detection.confidence:.2f}"
+                            if detection.confidence is not None
+                            else ""
+                        )
                     ),
                     color_key=road_user.type,
                 )
@@ -107,7 +111,11 @@ class ObjectDetectionStage:
                     "type": road_user.type,
                     "label": detection.label,
                     "bbox_xyxy": list(bbox),
-                    "confidence": detection.confidence,
+                    **(
+                        {"confidence": detection.confidence}
+                        if detection.confidence is not None
+                        else {}
+                    ),
                 }
             )
 
@@ -118,11 +126,14 @@ class ObjectDetectionStage:
                 f"image={image_width}x{image_height}"
             )
 
-        request: dict[str, JsonValue] = {
-            "image": frame.image.path.name,
-            "model": batch.model,
-            "prompts": list(prompts),
-        }
+        request: dict[str, JsonValue] = dict(batch.request or {})
+        request.update(
+            {
+                "image": frame.image.path.name,
+                "model": batch.model,
+                "prompts": list(prompts),
+            }
+        )
         return StageOutput(
             road_users=tuple(road_users),
             traces=(

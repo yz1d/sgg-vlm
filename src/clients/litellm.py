@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+from copy import deepcopy
 import hashlib
 import os
 import time
@@ -50,7 +51,8 @@ class LiteLlmClient:
                 }
             )
 
-        parameters: dict[str, Any] = dict(self.config.parameters)
+        parameters: dict[str, Any] = deepcopy(self.config.parameters)
+        _apply_reasoning_config(parameters, self.config)
         if request.response_schema is not None:
             if "response_format" in parameters:
                 raise ValueError(
@@ -137,4 +139,83 @@ class LiteLlmClient:
             model=model,
             raw=raw,
             request=request_manifest,
+        )
+
+
+def _apply_reasoning_config(
+    parameters: dict[str, Any], config: VlmConfig
+) -> None:
+    reasoning = config.reasoning
+    _reject_native_reasoning_parameters(parameters)
+    if reasoning.mode == "default":
+        return
+
+    provider, _, model = config.model.partition("/")
+    if not model:
+        raise ValueError(
+            "VLM model must include its LiteLLM provider prefix"
+        )
+
+    if provider == "dashscope":
+        extra_body = parameters.setdefault("extra_body", {})
+        if not isinstance(extra_body, dict):
+            raise ValueError("VLM extra_body parameter must be an object")
+        extra_body["enable_thinking"] = reasoning.mode == "enabled"
+        if reasoning.effort is not None:
+            if model == "qwen3.8-max" and reasoning.effort not in {
+                "low",
+                "medium",
+                "xhigh",
+            }:
+                raise ValueError(
+                    "qwen3.8-max reasoning effort must be low, medium, or xhigh"
+                )
+            extra_body["reasoning_effort"] = reasoning.effort
+        return
+
+    if provider in {"moonshot", "zai"}:
+        if reasoning.effort is not None:
+            raise ValueError(
+                f"{provider} model {model} does not support graded reasoning effort"
+            )
+        parameters["thinking"] = {
+            "type": "enabled" if reasoning.mode == "enabled" else "disabled"
+        }
+        return
+
+    if provider == "gemini":
+        if reasoning.mode == "disabled":
+            raise ValueError(
+                f"Gemini model {model} does not support disabled reasoning"
+            )
+        if reasoning.effort is not None:
+            parameters["reasoning_effort"] = reasoning.effort
+        return
+
+    if provider in {"openai", "anthropic"}:
+        parameters["reasoning_effort"] = (
+            "none" if reasoning.mode == "disabled" else reasoning.effort
+        )
+        if parameters["reasoning_effort"] is None:
+            parameters.pop("reasoning_effort")
+        return
+
+    raise ValueError(
+        f"Reasoning configuration does not support LiteLLM provider {provider!r}"
+    )
+
+
+def _reject_native_reasoning_parameters(parameters: dict[str, Any]) -> None:
+    conflicts = {"reasoning_effort", "thinking"}.intersection(parameters)
+    extra_body = parameters.get("extra_body")
+    if isinstance(extra_body, dict):
+        conflicts.update(
+            {"enable_thinking", "reasoning_effort", "thinking_budget"}.intersection(
+                extra_body
+            )
+        )
+    if conflicts:
+        names = ", ".join(sorted(conflicts))
+        raise ValueError(
+            f"Put reasoning controls in the reasoning config, not parameters: {names}"
         )

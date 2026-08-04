@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Annotated, Self
+from typing import Annotated, Literal, Self
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, model_validator
 import yaml
@@ -11,6 +11,23 @@ from src.traces import JsonValue
 
 type NonEmptyString = Annotated[str, Field(min_length=1)]
 type PositiveSeconds = Annotated[float, Field(gt=0)]
+type ReasoningMode = Literal["default", "disabled", "enabled"]
+type ReasoningEffort = Literal[
+    "minimal", "low", "medium", "high", "xhigh", "max"
+]
+
+
+class ReasoningConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    mode: ReasoningMode = "default"
+    effort: ReasoningEffort | None = None
+
+    @model_validator(mode="after")
+    def validate_effort(self) -> Self:
+        if self.mode != "enabled" and self.effort is not None:
+            raise ValueError("reasoning effort requires mode 'enabled'")
+        return self
 
 
 class VlmConfig(BaseModel):
@@ -25,6 +42,7 @@ class VlmConfig(BaseModel):
     api_base: NonEmptyString | None = None
     api_base_env: NonEmptyString | None = None
     timeout_seconds: PositiveSeconds = 120.0
+    reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
     parameters: dict[str, JsonValue] = Field(default_factory=dict)
 
 

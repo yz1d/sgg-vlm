@@ -6,7 +6,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from src.clients import GroundingDinoProClient, LiteLlmClient
+from src.clients import LiteLlmClient, VlmObjectDetectionClient
 from src.config import load_config
 from src.inputs import Av2Source, CodaSource, VideoSource
 from src.pipeline import Pipeline
@@ -72,7 +72,7 @@ def main() -> int:
             source=arguments.source,
             vlm=config.default_platform,
         )
-        detector = GroundingDinoProClient()
+        detector = VlmObjectDetectionClient(vlm_client)
         Pipeline(
             (
                 ObjectDetectionStage(detector),

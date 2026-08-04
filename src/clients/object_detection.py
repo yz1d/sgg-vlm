@@ -13,7 +13,7 @@ class Detection:
 
     label: str
     bbox_xyxy: tuple[float, float, float, float]
-    confidence: float
+    confidence: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -23,6 +23,7 @@ class DetectionBatch:
     model: str
     detections: tuple[Detection, ...]
     raw_response: JsonValue
+    request: dict[str, JsonValue] | None = None
 
 
 class ObjectDetectionClient(Protocol):

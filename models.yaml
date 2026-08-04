@@ -1,16 +1,13 @@
 default_platform: qwen
 platforms:
-  # Change `model` within this platform without changing application code.
   qwen:
-    model: dashscope/qwen3.7-flash
+    model: dashscope/qwen3.8-max
     api_key_env: DASHSCOPE_API_KEY
     api_base: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
     api_base_env: DASHSCOPE_API_BASE
     timeout_seconds: 120
-    parameters:
-      max_tokens: 4096
-      extra_body:
-        enable_thinking: true
+    reasoning:
+      mode: disabled
 
   kimi:
     model: moonshot/kimi-k2.6
@@ -18,10 +15,10 @@ platforms:
     api_base: https://api.moonshot.ai/v1
     api_base_env: MOONSHOT_API_BASE
     timeout_seconds: 120
+    reasoning:
+      mode: enabled
     parameters:
       max_tokens: 4096
-      thinking:
-        type: enabled
 
   glm:
     model: zai/glm-4.5v
@@ -29,15 +26,17 @@ platforms:
     api_base: https://api.z.ai/api/paas/v4
     api_base_env: ZAI_API_BASE
     timeout_seconds: 120
+    reasoning:
+      mode: enabled
     parameters:
       max_tokens: 4096
-      thinking:
-        type: enabled
 
   gemini:
     model: gemini/gemini-3.6-flash
     api_key_env: GEMINI_API_KEY
     timeout_seconds: 120
+    reasoning:
+      mode: enabled
+      effort: medium
     parameters:
       max_tokens: 8192
-      reasoning_effort: medium
