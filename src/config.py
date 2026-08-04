@@ -31,11 +31,24 @@ class ReasoningConfig(BaseModel):
         return self
 
 
-class ReasoningProfilesConfig(BaseModel):
+class StageModelConfig(BaseModel):
+    model_config = ConfigDict(
+        extra="forbid",
+        frozen=True,
+        str_strip_whitespace=True,
+    )
+
+    platform: NonEmptyString
+    reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
+
+
+class StageModelsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
-    detection: ReasoningConfig = Field(default_factory=ReasoningConfig)
-    extraction: ReasoningConfig = Field(default_factory=ReasoningConfig)
+    detection: StageModelConfig
+    road_region: StageModelConfig
+    relations: StageModelConfig
+    weather: StageModelConfig
 
 
 class VlmConfig(BaseModel):
@@ -71,24 +84,25 @@ class VlmPlatformsConfig(BaseModel):
         str_strip_whitespace=True,
     )
 
-    default_platform: NonEmptyString
     timeout_seconds: PositiveSeconds = 120.0
     max_tokens: Annotated[int, Field(gt=0)]
-    reasoning: ReasoningProfilesConfig
+    stages: StageModelsConfig
     platforms: dict[NonEmptyString, VlmConfig]
 
     @model_validator(mode="after")
-    def validate_default_platform(self) -> Self:
+    def validate_stage_platforms(self) -> Self:
         if not self.platforms:
             raise ValueError("Model config defines no VLM platforms")
-        if self.default_platform not in self.platforms:
-            raise ValueError(
-                "default_platform must name a configured VLM platform"
-            )
+        for stage_name, stage in self.stages:
+            if stage.platform not in self.platforms:
+                raise ValueError(
+                    f"Stage {stage_name!r} names unknown VLM platform "
+                    f"{stage.platform!r}"
+                )
         return self
 
-    def select(self) -> VlmConfig:
-        return self.platforms[self.default_platform]
+    def select(self, stage: StageModelConfig) -> VlmConfig:
+        return self.platforms[stage.platform]
 
 
 def load_app_config(path: Path) -> AppConfig:

@@ -1,12 +1,25 @@
-default_platform: qwen
 timeout_seconds: 120
 max_tokens: 8192
-reasoning:
+
+stages:
   detection:
-    mode: disabled
-  extraction:
-    mode: enabled
-    effort: low
+    platform: qwen
+    reasoning:
+      mode: disabled
+  road_region:
+    platform: gemini
+    reasoning:
+      mode: enabled
+      effort: low
+  relations:
+    platform: qwen
+    reasoning:
+      mode: enabled
+      effort: low
+  weather:
+    platform: qwen
+    reasoning:
+      mode: disabled
 
 platforms:
   qwen:

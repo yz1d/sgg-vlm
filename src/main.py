@@ -69,22 +69,44 @@ def main() -> int:
             )
         app_config = load_app_config(APP_CONFIG)
         model_config = load_model_config(MODEL_CONFIG)
-        platform = model_config.select()
+        stages = model_config.stages
         detection_vlm_client = LiteLlmClient(
-            platform,
+            model_config.select(stages.detection),
             timeout_seconds=model_config.timeout_seconds,
             max_tokens=model_config.max_tokens,
-            reasoning=model_config.reasoning.detection,
+            reasoning=stages.detection.reasoning,
         )
-        extraction_vlm_client = LiteLlmClient(
-            platform,
+        road_region_vlm_client = LiteLlmClient(
+            model_config.select(stages.road_region),
             timeout_seconds=model_config.timeout_seconds,
             max_tokens=model_config.max_tokens,
-            reasoning=model_config.reasoning.extraction,
+            reasoning=stages.road_region.reasoning,
+        )
+        relations_vlm_client = LiteLlmClient(
+            model_config.select(stages.relations),
+            timeout_seconds=model_config.timeout_seconds,
+            max_tokens=model_config.max_tokens,
+            reasoning=stages.relations.reasoning,
+        )
+        weather_vlm_client = LiteLlmClient(
+            model_config.select(stages.weather),
+            timeout_seconds=model_config.timeout_seconds,
+            max_tokens=model_config.max_tokens,
+            reasoning=stages.weather.reasoning,
+        )
+        platform_names = "-".join(
+            dict.fromkeys(
+                (
+                    stages.detection.platform,
+                    stages.road_region.platform,
+                    stages.relations.platform,
+                    stages.weather.platform,
+                )
+            )
         )
         run_directory = _new_run_directory(
             source=arguments.source,
-            vlm=model_config.default_platform,
+            vlm=platform_names,
         )
         detector = VlmObjectDetectionClient(detection_vlm_client)
         Pipeline(
@@ -95,9 +117,9 @@ def main() -> int:
                         app_config.object_detection.min_object_area_ratio
                     ),
                 ),
-                RoadLayoutExtractionStage(extraction_vlm_client),
-                RelationExtractionStage(extraction_vlm_client),
-                WeatherExtractionStage(extraction_vlm_client),
+                RoadLayoutExtractionStage(road_region_vlm_client),
+                RelationExtractionStage(relations_vlm_client),
+                WeatherExtractionStage(weather_vlm_client),
             )
         ).run(source, output_root=run_directory)
     except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:
