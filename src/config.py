@@ -30,6 +30,13 @@ class ReasoningConfig(BaseModel):
         return self
 
 
+class ReasoningProfilesConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    detection: ReasoningConfig = Field(default_factory=ReasoningConfig)
+    extraction: ReasoningConfig = Field(default_factory=ReasoningConfig)
+
+
 class VlmConfig(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -38,11 +45,7 @@ class VlmConfig(BaseModel):
     )
 
     model: NonEmptyString
-    api_key_env: NonEmptyString
-    api_base: NonEmptyString | None = None
-    api_base_env: NonEmptyString | None = None
-    timeout_seconds: PositiveSeconds = 120.0
-    reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
+    api_base: NonEmptyString
     parameters: dict[str, JsonValue] = Field(default_factory=dict)
 
 
@@ -54,6 +57,9 @@ class VlmPlatformsConfig(BaseModel):
     )
 
     default_platform: NonEmptyString
+    timeout_seconds: PositiveSeconds = 120.0
+    max_tokens: Annotated[int, Field(gt=0)]
+    reasoning: ReasoningProfilesConfig
     platforms: dict[NonEmptyString, VlmConfig]
 
     @model_validator(mode="after")

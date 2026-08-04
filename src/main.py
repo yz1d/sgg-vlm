@@ -67,18 +67,30 @@ def main() -> int:
                 image_id=arguments.image_id,
             )
         config = load_config(MODEL_CONFIG)
-        vlm_client = LiteLlmClient(config.select())
+        platform = config.select()
+        detection_vlm_client = LiteLlmClient(
+            platform,
+            timeout_seconds=config.timeout_seconds,
+            max_tokens=config.max_tokens,
+            reasoning=config.reasoning.detection,
+        )
+        extraction_vlm_client = LiteLlmClient(
+            platform,
+            timeout_seconds=config.timeout_seconds,
+            max_tokens=config.max_tokens,
+            reasoning=config.reasoning.extraction,
+        )
         run_directory = _new_run_directory(
             source=arguments.source,
             vlm=config.default_platform,
         )
-        detector = VlmObjectDetectionClient(vlm_client)
+        detector = VlmObjectDetectionClient(detection_vlm_client)
         Pipeline(
             (
                 ObjectDetectionStage(detector),
-                RoadLayoutExtractionStage(vlm_client),
-                RelationExtractionStage(vlm_client),
-                WeatherExtractionStage(vlm_client),
+                RoadLayoutExtractionStage(extraction_vlm_client),
+                RelationExtractionStage(extraction_vlm_client),
+                WeatherExtractionStage(extraction_vlm_client),
             )
         ).run(source, output_root=run_directory)
     except (FileNotFoundError, IndexError, OSError, RuntimeError, ValueError) as exc:

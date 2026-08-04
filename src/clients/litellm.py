@@ -11,21 +11,46 @@ from dotenv import load_dotenv
 from litellm import ModelResponse, completion
 
 from src.clients.vlm import VlmRequest, VlmResponse
-from src.config import VlmConfig
+from src.config import ReasoningConfig, VlmConfig
 from src.traces import JsonValue
+
+
+_API_KEY_ENV_BY_PROVIDER = {
+    "anthropic": "ANTHROPIC_API_KEY",
+    "dashscope": "DASHSCOPE_API_KEY",
+    "gemini": "GEMINI_API_KEY",
+    "moonshot": "MOONSHOT_API_KEY",
+    "openai": "OPENAI_API_KEY",
+    "zai": "ZAI_API_KEY",
+}
 
 
 class LiteLlmClient:
     """Invoke multimodal chat models through LiteLLM's provider adapters."""
 
-    def __init__(self, config: VlmConfig) -> None:
+    def __init__(
+        self,
+        config: VlmConfig,
+        *,
+        timeout_seconds: float,
+        max_tokens: int,
+        reasoning: ReasoningConfig,
+    ) -> None:
         self.config = config
+        self.timeout_seconds = timeout_seconds
+        self.max_tokens = max_tokens
+        self.reasoning = reasoning
         load_dotenv()
-        self.api_key = os.environ.get(config.api_key_env)
-        if not self.api_key:
+        provider = _model_provider(config.model)
+        try:
+            self.api_key_env = _API_KEY_ENV_BY_PROVIDER[provider]
+        except KeyError as exc:
             raise ValueError(
-                f"Set {config.api_key_env} in the environment or .env"
-            )
+                f"No API key environment variable is known for provider {provider!r}"
+            ) from exc
+        self.api_key = os.environ.get(self.api_key_env)
+        if not self.api_key:
+            raise ValueError(f"Set {self.api_key_env} in the environment or .env")
 
     def complete(self, request: VlmRequest) -> VlmResponse:
         content: list[dict[str, Any]] = [
@@ -52,7 +77,10 @@ class LiteLlmClient:
             )
 
         parameters: dict[str, Any] = deepcopy(self.config.parameters)
-        _apply_reasoning_config(parameters, self.config)
+        if "max_tokens" in parameters:
+            raise ValueError("Put max_tokens in the top-level model config")
+        parameters["max_tokens"] = self.max_tokens
+        _apply_reasoning_config(parameters, self.config, self.reasoning)
         if request.response_schema is not None:
             if "response_format" in parameters:
                 raise ValueError(
@@ -67,11 +95,7 @@ class LiteLlmClient:
                 },
             }
 
-        api_base = (
-            os.environ.get(self.config.api_base_env)
-            if self.config.api_base_env is not None
-            else None
-        ) or self.config.api_base
+        api_base = self.config.api_base
         print(f"[vlm] request started: model={self.config.model}")
         started = time.monotonic()
         try:
@@ -82,7 +106,7 @@ class LiteLlmClient:
                     messages=[{"role": "user", "content": content}],
                     api_key=self.api_key,
                     api_base=api_base,
-                    timeout=self.config.timeout_seconds,
+                    timeout=self.timeout_seconds,
                     **parameters,
                 ),
             )
@@ -129,8 +153,8 @@ class LiteLlmClient:
             "transport": "litellm.completion",
             "model": self.config.model,
             "api_base": api_base,
-            "api_key_env": self.config.api_key_env,
-            "timeout_seconds": self.config.timeout_seconds,
+            "api_key_env": self.api_key_env,
+            "timeout_seconds": self.timeout_seconds,
             "parameters": cast(JsonValue, parameters),
             "images": image_manifest,
         }
@@ -142,19 +166,24 @@ class LiteLlmClient:
         )
 
 
+def _model_provider(model: str) -> str:
+    provider, separator, _ = model.partition("/")
+    if not separator:
+        raise ValueError("VLM model must include its LiteLLM provider prefix")
+    return provider
+
+
 def _apply_reasoning_config(
-    parameters: dict[str, Any], config: VlmConfig
+    parameters: dict[str, Any],
+    config: VlmConfig,
+    reasoning: ReasoningConfig,
 ) -> None:
-    reasoning = config.reasoning
     _reject_native_reasoning_parameters(parameters)
     if reasoning.mode == "default":
         return
 
-    provider, _, model = config.model.partition("/")
-    if not model:
-        raise ValueError(
-            "VLM model must include its LiteLLM provider prefix"
-        )
+    provider = _model_provider(config.model)
+    _, _, model = config.model.partition("/")
 
     if provider == "dashscope":
         extra_body = parameters.setdefault("extra_body", {})
@@ -174,22 +203,17 @@ def _apply_reasoning_config(
         return
 
     if provider in {"moonshot", "zai"}:
-        if reasoning.effort is not None:
-            raise ValueError(
-                f"{provider} model {model} does not support graded reasoning effort"
-            )
         parameters["thinking"] = {
             "type": "enabled" if reasoning.mode == "enabled" else "disabled"
         }
         return
 
     if provider == "gemini":
-        if reasoning.mode == "disabled":
-            raise ValueError(
-                f"Gemini model {model} does not support disabled reasoning"
-            )
-        if reasoning.effort is not None:
-            parameters["reasoning_effort"] = reasoning.effort
+        parameters["reasoning_effort"] = (
+            "none" if reasoning.mode == "disabled" else reasoning.effort
+        )
+        if parameters["reasoning_effort"] is None:
+            parameters.pop("reasoning_effort")
         return
 
     if provider in {"openai", "anthropic"}:
