@@ -1,0 +1,2 @@
+object_detection:
+  min_object_area_ratio: 0.0003

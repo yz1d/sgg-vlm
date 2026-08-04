@@ -7,7 +7,7 @@ import time
 from pathlib import Path
 
 from src.clients import LiteLlmClient, VlmObjectDetectionClient
-from src.config import load_config
+from src.config import load_app_config, load_model_config
 from src.inputs import Av2Source, CodaSource, VideoSource
 from src.pipeline import Pipeline
 from src.stages import (
@@ -22,6 +22,7 @@ AV2_ROOT = REPOSITORY_ROOT / "inputs/av2/sensor"
 CODA_ROOT = REPOSITORY_ROOT / "inputs/coda"
 VIDEO_ROOT = REPOSITORY_ROOT / "inputs/videos"
 OUTPUT_ROOT = REPOSITORY_ROOT / "outputs"
+APP_CONFIG = REPOSITORY_ROOT / "configs.yaml"
 MODEL_CONFIG = REPOSITORY_ROOT / "models.yaml"
 
 
@@ -66,28 +67,34 @@ def main() -> int:
                 subset=arguments.subset,
                 image_id=arguments.image_id,
             )
-        config = load_config(MODEL_CONFIG)
-        platform = config.select()
+        app_config = load_app_config(APP_CONFIG)
+        model_config = load_model_config(MODEL_CONFIG)
+        platform = model_config.select()
         detection_vlm_client = LiteLlmClient(
             platform,
-            timeout_seconds=config.timeout_seconds,
-            max_tokens=config.max_tokens,
-            reasoning=config.reasoning.detection,
+            timeout_seconds=model_config.timeout_seconds,
+            max_tokens=model_config.max_tokens,
+            reasoning=model_config.reasoning.detection,
         )
         extraction_vlm_client = LiteLlmClient(
             platform,
-            timeout_seconds=config.timeout_seconds,
-            max_tokens=config.max_tokens,
-            reasoning=config.reasoning.extraction,
+            timeout_seconds=model_config.timeout_seconds,
+            max_tokens=model_config.max_tokens,
+            reasoning=model_config.reasoning.extraction,
         )
         run_directory = _new_run_directory(
             source=arguments.source,
-            vlm=config.default_platform,
+            vlm=model_config.default_platform,
         )
         detector = VlmObjectDetectionClient(detection_vlm_client)
         Pipeline(
             (
-                ObjectDetectionStage(detector),
+                ObjectDetectionStage(
+                    detector,
+                    min_object_area_ratio=(
+                        app_config.object_detection.min_object_area_ratio
+                    ),
+                ),
                 RoadLayoutExtractionStage(extraction_vlm_client),
                 RelationExtractionStage(extraction_vlm_client),
                 WeatherExtractionStage(extraction_vlm_client),

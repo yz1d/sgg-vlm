@@ -11,6 +11,7 @@ from src.traces import JsonValue
 
 type NonEmptyString = Annotated[str, Field(min_length=1)]
 type PositiveSeconds = Annotated[float, Field(gt=0)]
+type UnitInterval = Annotated[float, Field(ge=0, le=1)]
 type ReasoningMode = Literal["default", "disabled", "enabled"]
 type ReasoningEffort = Literal[
     "minimal", "low", "medium", "high", "xhigh", "max"
@@ -49,6 +50,20 @@ class VlmConfig(BaseModel):
     parameters: dict[str, JsonValue] = Field(default_factory=dict)
 
 
+class ObjectDetectionConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    min_object_area_ratio: UnitInterval = 0.0
+
+
+class AppConfig(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    object_detection: ObjectDetectionConfig = Field(
+        default_factory=ObjectDetectionConfig
+    )
+
+
 class VlmPlatformsConfig(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -76,16 +91,31 @@ class VlmPlatformsConfig(BaseModel):
         return self.platforms[self.default_platform]
 
 
-def load_config(path: Path) -> VlmPlatformsConfig:
+def load_app_config(path: Path) -> AppConfig:
+    """Load pipeline behavior configuration from YAML."""
+
+    return _load_yaml_config(path, AppConfig, name="application")
+
+
+def load_model_config(path: Path) -> VlmPlatformsConfig:
     """Load VLM platform configuration from YAML."""
 
+    return _load_yaml_config(path, VlmPlatformsConfig, name="model")
+
+
+def _load_yaml_config[T: BaseModel](
+    path: Path,
+    model: type[T],
+    *,
+    name: str,
+) -> T:
     path = Path(path)
     try:
         document = yaml.safe_load(path.read_text(encoding="utf-8"))
     except yaml.YAMLError as exc:
-        raise ValueError(f"Invalid model config {path}: {exc}") from exc
+        raise ValueError(f"Invalid {name} config {path}: {exc}") from exc
 
     try:
-        return VlmPlatformsConfig.model_validate(document)
+        return model.model_validate(document)
     except ValidationError as exc:
-        raise ValueError(f"Invalid model config {path}: {exc}") from exc
+        raise ValueError(f"Invalid {name} config {path}: {exc}") from exc

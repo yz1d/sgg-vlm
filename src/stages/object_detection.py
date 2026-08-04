@@ -23,8 +23,16 @@ class ObjectDetectionStage:
 
     name = "object-detection"
 
-    def __init__(self, client: ObjectDetectionClient) -> None:
+    def __init__(
+        self,
+        client: ObjectDetectionClient,
+        *,
+        min_object_area_ratio: float = 0.0,
+    ) -> None:
+        if not 0 <= min_object_area_ratio <= 1:
+            raise ValueError("min_object_area_ratio must be between 0 and 1")
         self.client = client
+        self.min_object_area_ratio = min_object_area_ratio
 
     def run(self, frame: Frame) -> StageOutput:
         targets = DETECTION_TARGETS
@@ -41,8 +49,10 @@ class ObjectDetectionStage:
         road_users: list[PerceivedRoadUser] = []
         annotations: list[BoxAnnotation] = []
         normalized: list[JsonValue] = []
+        filtered: list[JsonValue] = []
         clipped_count = 0
         discarded_count = 0
+        image_area = image_width * image_height
         for detection in batch.detections:
             target = target_by_prompt.get(detection.label.casefold())
             if target is None:
@@ -60,6 +70,24 @@ class ObjectDetectionStage:
                 continue
             if bbox != detection.bbox_xyxy:
                 clipped_count += 1
+            area_ratio = (
+                (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) / image_area
+            )
+            if area_ratio < self.min_object_area_ratio:
+                filtered.append(
+                    {
+                        "label": detection.label,
+                        "bbox_xyxy": list(bbox),
+                        "area_ratio": area_ratio,
+                        "reason": "below_min_object_area_ratio",
+                        **(
+                            {"confidence": detection.confidence}
+                            if detection.confidence is not None
+                            else {}
+                        ),
+                    }
+                )
+                continue
 
             while f"road_user_{next_id:03d}" in used_ids:
                 next_id += 1
@@ -111,6 +139,7 @@ class ObjectDetectionStage:
                     "type": road_user.type,
                     "label": detection.label,
                     "bbox_xyxy": list(bbox),
+                    "area_ratio": area_ratio,
                     **(
                         {"confidence": detection.confidence}
                         if detection.confidence is not None
@@ -119,10 +148,11 @@ class ObjectDetectionStage:
                 }
             )
 
-        if clipped_count or discarded_count:
+        if clipped_count or discarded_count or filtered:
             print(
                 f"[object-detection] normalized boxes clipped={clipped_count} "
-                f"discarded={discarded_count} "
+                f"discarded={discarded_count} filtered_small={len(filtered)} "
+                f"min_area_ratio={self.min_object_area_ratio:g} "
                 f"image={image_width}x{image_height}"
             )
 
@@ -132,6 +162,7 @@ class ObjectDetectionStage:
                 "image": frame.image.path.name,
                 "model": batch.model,
                 "prompts": list(prompts),
+                "min_object_area_ratio": self.min_object_area_ratio,
             }
         )
         return StageOutput(
@@ -140,6 +171,7 @@ class ObjectDetectionStage:
                 Trace.json("request.json", request),
                 Trace.json("response.raw.json", batch.raw_response),
                 Trace.json("detections.json", normalized),
+                Trace.json("filtered-detections.json", filtered),
                 Trace.bytes(
                     "overlay.png",
                     render_box_overlay(frame.image, annotations),
