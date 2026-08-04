@@ -2,8 +2,8 @@ id: https://w3id.org/sgg-vlm/schema
 name: sgg_vlm
 version: 0.1.0
 description: >-
-  The normalized scene graph produced by sgg-vlm. The schema contains road users,
-  road regions, object states, and relationships supported by the pipeline.
+  The normalized scene graph produced by sgg-vlm. The schema contains perceived
+  road entities, road regions, object states, and supported relationships.
 
 prefixes:
   linkml: https://w3id.org/linkml/
@@ -17,7 +17,7 @@ imports:
   - common
   - weather
   - states
-  - road_users
+  - road_entities
   - road_regions
   - relationships
 
@@ -49,9 +49,9 @@ classes:
       weather:
         description: Visible atmospheric condition for this scene.
         range: WeatherCondition
-      road_users:
-        description: Road users perceived in the frame, excluding ego.
-        range: PerceivedRoadUser
+      perceived_entities:
+        description: Non-ego road entities perceived in the frame.
+        range: PerceivedRoadEntity
         multivalued: true
         inlined_as_list: true
       road_regions:

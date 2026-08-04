@@ -41,13 +41,13 @@ class RoadLayoutExtractionStage:
         self.client = client
 
     def run(self, frame: Frame) -> StageOutput:
-        road_users = list(frame.graph.road_users or [])
+        perceived_entities = list(frame.graph.perceived_entities or [])
         identity_map = render_identity_map(frame)
         registry: list[JsonValue] = [
             {"id": "ego", "type": "EgoVehicle"},
             *(
-                {"id": road_user.id, "type": road_user.type}
-                for road_user in road_users
+                {"id": entity.id, "type": entity.type}
+                for entity in perceived_entities
             ),
         ]
         region_vocabulary: list[JsonValue] = [
@@ -63,7 +63,7 @@ class RoadLayoutExtractionStage:
         }
         prompt = _build_prompt(registry, region_vocabulary)
         stage_input: dict[str, JsonValue] = {
-            "road_users": registry,
+            "road_entities": registry,
             "road_regions": region_vocabulary,
         }
 
@@ -79,7 +79,10 @@ class RoadLayoutExtractionStage:
         )
         _validate_proposals(
             proposals,
-            known_subjects={"ego", *(road_user.id for road_user in road_users)},
+            known_subjects={
+                "ego",
+                *(entity.id for entity in perceived_entities),
+            },
             known_region_types=set(target_by_name),
         )
 
@@ -182,11 +185,11 @@ def _build_prompt(
 ) -> str:
     return f"""Identify occupied road regions from the schema vocabulary.
 
-The first image is original. The second labels road users. Ego is the camera vehicle.
-Use registry IDs only. Group road users that occupy the same region.
+The first image is original. The second labels perceived road entities. Ego is the camera vehicle.
+Use registry IDs only. Group road entities that occupy the same region.
 Return only clear facts.
 
-Road-user registry:
+Road-entity registry:
 {json.dumps(registry, separators=(",", ":"))}
 
 Road-region vocabulary:
@@ -212,7 +215,7 @@ def _validate_proposals(
             key = (subject, region.type)
             if key in membership_keys:
                 raise ValueError(
-                    f"Road user {subject} occupies more than one {region.type}"
+                    f"Road entity {subject} occupies more than one {region.type}"
                 )
             membership_keys.add(key)
 

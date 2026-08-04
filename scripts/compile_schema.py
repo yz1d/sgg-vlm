@@ -39,7 +39,7 @@ def main() -> int:
 
 def _catalog_source(view: SchemaView) -> str:
     detection_targets = []
-    for name in _concrete_descendants(view, "PerceivedRoadUser"):
+    for name in _concrete_descendants(view, "PerceivedRoadEntity"):
         prompt = _annotation(view.get_class(name), "object_detection_prompt")
         if prompt is not None:
             detection_targets.append((name, prompt))
@@ -142,7 +142,9 @@ def _catalog_source(view: SchemaView) -> str:
             )
         )
 
-    concrete_road_users = _concrete_descendants(view, "PerceivedRoadUser")
+    concrete_perceived_entities = _concrete_descendants(
+        view, "PerceivedRoadEntity"
+    )
     concrete_road_regions = _concrete_descendants(view, "RoadRegion")
     concrete_relationships = _concrete_descendants(view, "Relationship")
     concrete_states = _concrete_descendants(view, "ObjectState")
@@ -151,7 +153,7 @@ def _catalog_source(view: SchemaView) -> str:
         *(item for target in road_region_targets for item in (target[0], target[2])),
         *(item for target in relationship_targets for item in (target[0], target[2], target[3])),
         *(item for target in state_targets for item in (target[0], target[2])),
-        *concrete_road_users,
+        *concrete_perceived_entities,
         *concrete_road_regions,
         *concrete_relationships,
         *concrete_states,
@@ -255,7 +257,9 @@ def _catalog_source(view: SchemaView) -> str:
 
 def _restrict_scene_collections(models: str, view: SchemaView) -> str:
     collection_models = {
-        "road_users": _concrete_descendants(view, "PerceivedRoadUser"),
+        "perceived_entities": _concrete_descendants(
+            view, "PerceivedRoadEntity"
+        ),
         "road_regions": _concrete_descendants(view, "RoadRegion"),
         "states": _concrete_descendants(view, "ObjectState"),
         "relationships": _concrete_descendants(view, "Relationship"),

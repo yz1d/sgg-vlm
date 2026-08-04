@@ -37,7 +37,7 @@ def empty_scene(*, source: str, timestamp_ns: int | None) -> Scene:
         timestamp_ns=timestamp_ns,
         provenance=[provenance],
         ego=EgoVehicle(id="ego", provenance=[provenance]),
-        road_users=[],
+        perceived_entities=[],
         road_regions=[],
         states=[],
         relationships=[],

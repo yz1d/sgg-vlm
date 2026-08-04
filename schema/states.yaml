@@ -12,7 +12,7 @@ default_range: string
 
 imports:
   - common
-  - road_users
+  - road_entities
 
 classes:
   ObjectState:

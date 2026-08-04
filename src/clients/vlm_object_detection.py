@@ -112,12 +112,14 @@ class VlmObjectDetectionClient:
 
 def _build_prompt(labels: tuple[str, ...]) -> str:
     label_json = json.dumps(labels, separators=(",", ":"))
-    return f"""Inspect this front-camera road image and locate every visible road user.
+    return f"""Inspect this front-camera road image and locate every requested road entity.
 
 Use exactly this label vocabulary: {label_json}
-Include small or partly occluded objects when they are visible.
-Classify each physical object once. Use school bus instead of bus when applicable.
-Use a tight box around the visible extent. Do not infer objects outside the image.
+Include small or partly occluded entities when they are visible.
+Classify each physical road user once. Use school bus instead of bus when applicable.
+Treat a blocked road area as one contiguous area unavailable for normal vehicle travel.
+For a blocked road area, box the full area instead of each cone, barrier, worker, or vehicle.
+Use a tight box around the visible extent. Do not infer entities outside the image.
 Return JSON as detections with one label and bbox per object.
 Coordinates use [x_min,y_min,x_max,y_max], normalized from 0 through 1000.
 The top-left image corner is [0,0]. The bottom-right corner is [1000,1000].

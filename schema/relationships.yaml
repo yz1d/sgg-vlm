@@ -12,7 +12,7 @@ default_range: string
 
 imports:
   - road_regions
-  - road_users
+  - road_entities
 
 classes:
   Relationship:
@@ -37,13 +37,13 @@ classes:
         required: true
 
   SpatialRelationship:
-    description: An abstract road-coordinate relationship from a perceived road user to ego.
+    description: An abstract road-coordinate relationship from a perceived road entity to ego.
     abstract: true
     is_a: Relationship
     attributes:
       subject:
-        description: Perceived road user described relative to ego.
-        range: PerceivedRoadUser
+        description: Perceived road entity described relative to ego.
+        range: PerceivedRoadEntity
         required: true
       object:
         description: Ego vehicle used as the spatial reference.
@@ -79,16 +79,16 @@ classes:
       exclusive_group: lateral
 
   RoadRegionRelationship:
-    description: An abstract relationship from a road user to a road region.
+    description: An abstract relationship from a road entity to a road region.
     abstract: true
     is_a: Relationship
     attributes:
       subject:
-        description: Road user located in the road region.
-        range: RoadUser
+        description: Road entity located in the road region.
+        range: RoadEntity
         required: true
       object:
-        description: Road region that contains the road user's ground reference point.
+        description: Road region that contains the road entity's ground reference point.
         range: RoadRegion
         required: true
 

@@ -11,41 +11,45 @@ class GraphValidationError(ValueError):
 def validate_scene(graph: Scene) -> None:
     """Validate graph invariants that require comparisons across records."""
 
-    road_users = graph.road_users or []
+    perceived_entities = graph.perceived_entities or []
     road_regions = graph.road_regions or []
     states = graph.states or []
     relationships = graph.relationships or []
 
-    for road_user in road_users:
-        bbox = road_user.bbox
+    for entity in perceived_entities:
+        bbox = entity.bbox
         if bbox.x_min > bbox.x_max or bbox.y_min > bbox.y_max:
             raise GraphValidationError(
-                f"Road user {road_user.id} has an invalid bounding box"
+                f"Perceived entity {entity.id} has an invalid bounding box"
             )
 
-    road_user_ids = [road_user.id for road_user in road_users]
-    if len(road_user_ids) != len(set(road_user_ids)):
-        raise GraphValidationError("Road-user IDs must be unique")
-    if "ego" in road_user_ids:
-        raise GraphValidationError("The reserved ego ID cannot be a road user")
+    perceived_entity_ids = [entity.id for entity in perceived_entities]
+    if len(perceived_entity_ids) != len(set(perceived_entity_ids)):
+        raise GraphValidationError("Perceived-entity IDs must be unique")
+    if "ego" in perceived_entity_ids:
+        raise GraphValidationError(
+            "The reserved ego ID cannot be a perceived entity"
+        )
     road_region_ids = [road_region.id for road_region in road_regions]
     if len(road_region_ids) != len(set(road_region_ids)):
         raise GraphValidationError("Road-region IDs must be unique")
-    entity_ids = ["ego", *road_user_ids, *road_region_ids]
+    entity_ids = ["ego", *perceived_entity_ids, *road_region_ids]
     if len(entity_ids) != len(set(entity_ids)):
         raise GraphValidationError("Entity IDs must be unique")
 
-    road_user_by_id = {road_user.id: road_user for road_user in road_users}
+    perceived_entity_by_id = {
+        entity.id: entity for entity in perceived_entities
+    }
     state_target_by_type = {
         target.model.__name__: target for target in STATE_TARGETS
     }
     state_keys = [(state.subject, state.type) for state in states]
     if len(state_keys) != len(set(state_keys)):
         raise GraphValidationError(
-            "Object-state types must be unique for each road user"
+            "Object-state types must be unique for each subject"
         )
     for state in states:
-        subject = road_user_by_id.get(state.subject)
+        subject = perceived_entity_by_id.get(state.subject)
         if subject is None:
             raise GraphValidationError(
                 f"Object state {state.type} has unknown subject {state.subject}"
@@ -70,7 +74,7 @@ def validate_scene(graph: Scene) -> None:
         )
     entity_by_id = {
         "ego": graph.ego,
-        **road_user_by_id,
+        **perceived_entity_by_id,
         **{road_region.id: road_region for road_region in road_regions},
     }
     relationship_target_by_type = {
@@ -105,7 +109,7 @@ def validate_scene(graph: Scene) -> None:
             key = (relationship.subject, target.exclusive_group)
             if key in relationship_groups:
                 raise GraphValidationError(
-                    f"Road user {relationship.subject} has more than one "
+                    f"Entity {relationship.subject} has more than one "
                     f"{target.exclusive_group} relationship"
                 )
             relationship_groups.add(key)

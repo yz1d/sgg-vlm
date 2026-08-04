@@ -61,14 +61,16 @@ def graph_to_dot(graph: Scene) -> str:
         label = state.type + (f": {detail}" if detail else "")
         states_by_subject.setdefault(state.subject, []).append(label)
 
-    road_users = sorted(graph.road_users or [], key=lambda road_user: road_user.id)
-    for road_user in road_users:
-        label = f"{road_user.id}\n{road_user.type}"
-        for state in states_by_subject.get(road_user.id, []):
+    perceived_entities = sorted(
+        graph.perceived_entities or [], key=lambda entity: entity.id
+    )
+    for entity in perceived_entities:
+        label = f"{entity.id}\n{entity.type}"
+        for state in states_by_subject.get(entity.id, []):
             label += f"\n[{state}]"
         lines.append(
-            f"  {quoted(road_user.id)} "
-            f"[label={quoted(label)}, fillcolor={quoted(color_for(road_user.type))}];"
+            f"  {quoted(entity.id)} "
+            f"[label={quoted(label)}, fillcolor={quoted(color_for(entity.type))}];"
         )
 
     road_regions = sorted(
@@ -88,20 +90,21 @@ def graph_to_dot(graph: Scene) -> str:
             (relationship.subject, relationship.object), []
         ).append(relationship.type)
 
-    road_user_ids = [road_user.id for road_user in road_users]
-    if road_user_ids:
+    perceived_entity_ids = [entity.id for entity in perceived_entities]
+    if perceived_entity_ids:
         lines.append(
-            f"  {{ rank=same; {'; '.join(quoted(item) for item in road_user_ids)}; }}"
+            f"  {{ rank=same; "
+            f"{'; '.join(quoted(item) for item in perceived_entity_ids)}; }}"
         )
         connected_to_ego = {
             object_ if subject == "ego" else subject
             for subject, object_ in relations_by_pair
             if subject == "ego" or object_ == "ego"
         }
-        for road_user_id in road_user_ids:
-            if road_user_id not in connected_to_ego:
+        for entity_id in perceived_entity_ids:
+            if entity_id not in connected_to_ego:
                 lines.append(
-                    f'  "ego" -> {quoted(road_user_id)} '
+                    f'  "ego" -> {quoted(entity_id)} '
                     "[style=invis, weight=100];"
                 )
 

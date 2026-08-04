@@ -44,7 +44,7 @@ class ExtractionResponse(BaseModel):
 
 
 class RelationExtractionStage:
-    """Add schema-defined object-to-ego relationships and object states."""
+    """Add schema-defined entity-to-ego relationships and object states."""
 
     name = "relation-extraction"
 
@@ -52,31 +52,34 @@ class RelationExtractionStage:
         self.client = client
 
     def run(self, frame: Frame) -> StageOutput:
-        road_users = list(frame.graph.road_users or [])
+        perceived_entities = list(frame.graph.perceived_entities or [])
         relationship_vocabulary = tuple(
             target for target in RELATIONSHIP_TARGETS if target.extraction_enabled
         )
         state_vocabulary = STATE_TARGETS
         identity_map = render_identity_map(frame)
         registry: list[JsonValue] = [
-            {"id": road_user.id, "type": road_user.type}
-            for road_user in road_users
+            {"id": entity.id, "type": entity.type}
+            for entity in perceived_entities
         ]
         vocabulary = _vocabulary_payload(
             relationship_vocabulary, state_vocabulary
         )
         prompt = _build_prompt(registry, vocabulary)
         stage_input: dict[str, JsonValue] = {
-            "road_users": registry,
+            "perceived_entities": registry,
             "vocabulary": vocabulary,
         }
 
-        if not road_users:
+        if not perceived_entities:
             return StageOutput(
                 traces=(
                     Trace.text("prompt.txt", prompt),
                     Trace.json("stage-input.json", stage_input),
-                    Trace.json("request.json", {"skipped": "no road users"}),
+                    Trace.json(
+                        "request.json",
+                        {"skipped": "no perceived road entities"},
+                    ),
                     Trace.bytes("identity-map.png", identity_map),
                     Trace.json("relationships.json", []),
                     Trace.json("states.json", []),
@@ -96,7 +99,9 @@ class RelationExtractionStage:
         proposals = ExtractionResponse.model_validate(
             parse_vlm_json(response.text)
         )
-        road_user_by_id = {road_user.id: road_user for road_user in road_users}
+        entity_by_id = {
+            entity.id: entity for entity in perceived_entities
+        }
         relationship_by_name = {
             target.model.__name__: target for target in relationship_vocabulary
         }
@@ -105,7 +110,7 @@ class RelationExtractionStage:
         }
         _validate_proposals(
             proposals,
-            road_user_by_id=road_user_by_id,
+            entity_by_id=entity_by_id,
             relationship_by_name=relationship_by_name,
             state_by_name=state_by_name,
         )
@@ -225,13 +230,14 @@ def _vocabulary_payload(
 def _build_prompt(
     registry: list[JsonValue], vocabulary: dict[str, JsonValue]
 ) -> str:
-    return f"""Extract clear schema-defined facts for these road users.
+    return f"""Extract clear schema-defined facts for these perceived road entities.
 
-The first image is original. The second labels road users. Ego is the camera vehicle.
-Every relationship describes one road user relative to ego.
+The first image is original. The second labels perceived road entities. Ego is the camera vehicle.
+Every relationship describes one perceived road entity relative to ego.
+Object states apply only to compatible road-user types in the vocabulary.
 Use only the registry and vocabulary. Return only clear facts.
 
-Road-user registry:
+Perceived-entity registry:
 {json.dumps(registry, separators=(",", ":"))}
 
 Schema vocabulary:
@@ -242,14 +248,14 @@ Schema vocabulary:
 def _validate_proposals(
     proposals: ExtractionResponse,
     *,
-    road_user_by_id: Mapping[str, object],
+    entity_by_id: Mapping[str, object],
     relationship_by_name: dict[str, RelationshipTarget],
     state_by_name: dict[str, StateTarget],
 ) -> None:
     relationship_keys: set[tuple[str, str]] = set()
     groups: set[tuple[str, str]] = set()
     for proposal in proposals.relationships:
-        if proposal.subject not in road_user_by_id:
+        if proposal.subject not in entity_by_id:
             raise ValueError(
                 f"Relationship has unknown subject: {proposal.subject}"
             )
@@ -271,16 +277,16 @@ def _validate_proposals(
 
     state_keys: set[tuple[str, str]] = set()
     for proposal in proposals.states:
-        road_user = road_user_by_id.get(proposal.subject)
-        if road_user is None:
+        entity = entity_by_id.get(proposal.subject)
+        if entity is None:
             raise ValueError(f"Object state has unknown subject: {proposal.subject}")
         target = state_by_name.get(proposal.type)
         if target is None:
             raise ValueError(f"Unknown object-state type: {proposal.type}")
-        if not isinstance(road_user, target.subject_model):
+        if not isinstance(entity, target.subject_model):
             raise ValueError(
                 f"Object state {proposal.type} does not apply to "
-                f"{getattr(road_user, 'type', type(road_user).__name__)}"
+                f"{getattr(entity, 'type', type(entity).__name__)}"
             )
         key = (proposal.subject, proposal.type)
         if key in state_keys:
