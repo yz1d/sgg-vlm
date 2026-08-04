@@ -8,7 +8,7 @@ from pathlib import Path
 
 from src.clients import GroundingDinoProClient, LiteLlmClient
 from src.config import load_config
-from src.inputs import Av2Source, VideoSource
+from src.inputs import Av2Source, CodaSource, VideoSource
 from src.pipeline import Pipeline
 from src.stages import (
     ObjectDetectionStage,
@@ -19,6 +19,7 @@ from src.stages import (
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 AV2_ROOT = REPOSITORY_ROOT / "inputs/av2/sensor"
+CODA_ROOT = REPOSITORY_ROOT / "inputs/coda"
 VIDEO_ROOT = REPOSITORY_ROOT / "inputs/videos"
 OUTPUT_ROOT = REPOSITORY_ROOT / "outputs"
 MODEL_CONFIG = REPOSITORY_ROOT / "models.yaml"
@@ -41,6 +42,12 @@ def main() -> int:
     av2.add_argument("--split", choices=("train", "val"), default="val")
     av2.add_argument("--frame", type=int, default=0)
 
+    coda = subparsers.add_parser(
+        "coda", help="Load one front-camera image from CODA"
+    )
+    coda.add_argument("image_id", type=int)
+    coda.add_argument("--subset", choices=("sample", "val"), default="val")
+
     arguments = parser.parse_args()
     try:
         if arguments.source == "video":
@@ -48,10 +55,16 @@ def main() -> int:
                 VIDEO_ROOT / arguments.filename,
                 timestamp_seconds=arguments.timestamp,
             )
-        else:
+        elif arguments.source == "av2":
             source = Av2Source(
                 AV2_ROOT / arguments.split / arguments.log_id,
                 camera_frame_index=arguments.frame,
+            )
+        else:
+            source = CodaSource(
+                CODA_ROOT / arguments.subset,
+                subset=arguments.subset,
+                image_id=arguments.image_id,
             )
         config = load_config(MODEL_CONFIG)
         vlm_client = LiteLlmClient(config.select())
