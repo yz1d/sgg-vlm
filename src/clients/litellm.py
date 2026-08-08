@@ -16,12 +16,8 @@ from src.traces import JsonValue
 
 
 _API_KEY_ENV_BY_PROVIDER = {
-    "anthropic": "ANTHROPIC_API_KEY",
     "dashscope": "DASHSCOPE_API_KEY",
     "gemini": "GEMINI_API_KEY",
-    "moonshot": "MOONSHOT_API_KEY",
-    "openai": "OPENAI_API_KEY",
-    "zai": "ZAI_API_KEY",
 }
 
 
@@ -202,21 +198,7 @@ def _apply_reasoning_config(
             extra_body["reasoning_effort"] = reasoning.effort
         return
 
-    if provider in {"moonshot", "zai"}:
-        parameters["thinking"] = {
-            "type": "enabled" if reasoning.mode == "enabled" else "disabled"
-        }
-        return
-
     if provider == "gemini":
-        parameters["reasoning_effort"] = (
-            "none" if reasoning.mode == "disabled" else reasoning.effort
-        )
-        if parameters["reasoning_effort"] is None:
-            parameters.pop("reasoning_effort")
-        return
-
-    if provider in {"openai", "anthropic"}:
         parameters["reasoning_effort"] = (
             "none" if reasoning.mode == "disabled" else reasoning.effort
         )

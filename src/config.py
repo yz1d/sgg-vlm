@@ -12,6 +12,7 @@ from src.traces import JsonValue
 type NonEmptyString = Annotated[str, Field(min_length=1)]
 type PositiveSeconds = Annotated[float, Field(gt=0)]
 type UnitInterval = Annotated[float, Field(ge=0, le=1)]
+type PlatformName = Literal["qwen", "gemini"]
 type ReasoningMode = Literal["default", "disabled", "enabled"]
 type ReasoningEffort = Literal[
     "minimal", "low", "medium", "high", "xhigh", "max"
@@ -38,7 +39,7 @@ class StageModelConfig(BaseModel):
         str_strip_whitespace=True,
     )
 
-    platform: NonEmptyString
+    platform: PlatformName
     reasoning: ReasoningConfig = Field(default_factory=ReasoningConfig)
 
 
@@ -77,6 +78,24 @@ class AppConfig(BaseModel):
     )
 
 
+class PlatformConfigs(BaseModel):
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    qwen: VlmConfig
+    gemini: VlmConfig
+
+    @model_validator(mode="after")
+    def validate_providers(self) -> Self:
+        expected_providers = {"qwen": "dashscope", "gemini": "gemini"}
+        for platform, provider in expected_providers.items():
+            config = getattr(self, platform)
+            if config.model.partition("/")[0] != provider:
+                raise ValueError(
+                    f"Platform {platform!r} requires LiteLLM provider {provider!r}"
+                )
+        return self
+
+
 class VlmPlatformsConfig(BaseModel):
     model_config = ConfigDict(
         extra="forbid",
@@ -87,22 +106,10 @@ class VlmPlatformsConfig(BaseModel):
     timeout_seconds: PositiveSeconds = 120.0
     max_tokens: Annotated[int, Field(gt=0)]
     stages: StageModelsConfig
-    platforms: dict[NonEmptyString, VlmConfig]
-
-    @model_validator(mode="after")
-    def validate_stage_platforms(self) -> Self:
-        if not self.platforms:
-            raise ValueError("Model config defines no VLM platforms")
-        for stage_name, stage in self.stages:
-            if stage.platform not in self.platforms:
-                raise ValueError(
-                    f"Stage {stage_name!r} names unknown VLM platform "
-                    f"{stage.platform!r}"
-                )
-        return self
+    platforms: PlatformConfigs
 
     def select(self, stage: StageModelConfig) -> VlmConfig:
-        return self.platforms[stage.platform]
+        return getattr(self.platforms, stage.platform)
 
 
 def load_app_config(path: Path) -> AppConfig:

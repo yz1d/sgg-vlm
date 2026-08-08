@@ -26,14 +26,6 @@ platforms:
     model: dashscope/qwen3.8-max
     api_base: https://dashscope-intl.aliyuncs.com/compatible-mode/v1
 
-  kimi:
-    model: moonshot/kimi-k2.6
-    api_base: https://api.moonshot.ai/v1
-
-  glm:
-    model: zai/glm-4.5v
-    api_base: https://api.z.ai/api/paas/v4
-
   gemini:
     model: gemini/gemini-3.6-flash
     api_base: https://generativelanguage.googleapis.com/v1beta
