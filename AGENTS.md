@@ -2,7 +2,7 @@ Generals:
 - No backward compatibility. Break old formats freely. Don't keep any old code or data which will only interfere with your future refactoring.
 - When I say "sgg-vlm.bak", I mean source code in `_references/sgg-vlm.bak`. Never write or change it. Treat it as a reference or inspiration critically.
 - We are using jj/jujustsu instead of git.
-
+- `_references/standards` contains multiple standards we can use to help define our ontology schema. Some are files, some are txt link to their online html version.
 Techology & Toolings:
 - Modern Python toolings around uv.
 
