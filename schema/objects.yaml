@@ -149,6 +149,8 @@ classes:
         description: Traffic direction in this lane relative to ego's direction.
         range: LaneDirection
         required: true
+        annotations:
+          road_layout_extraction: enabled
 
   StaticObject:
     description: A fixed landmark, traffic sign, sign board, or traffic light.

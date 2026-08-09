@@ -6,7 +6,7 @@ import subprocess
 import time
 from pathlib import Path
 
-from src.clients import LiteLlmClient, VlmObjectDetectionClient
+from src.clients import LiteLlmClient
 from src.config import load_app_config, load_model_config
 from src.inputs import Av2Source, CodaSource, VideoSource
 from src.pipeline import Pipeline
@@ -76,11 +76,11 @@ def main() -> int:
             max_tokens=model_config.max_tokens,
             reasoning=stages.detection.reasoning,
         )
-        road_region_vlm_client = LiteLlmClient(
-            model_config.select(stages.road_region),
+        road_layout_vlm_client = LiteLlmClient(
+            model_config.select(stages.road_layout),
             timeout_seconds=model_config.timeout_seconds,
             max_tokens=model_config.max_tokens,
-            reasoning=stages.road_region.reasoning,
+            reasoning=stages.road_layout.reasoning,
         )
         relations_vlm_client = LiteLlmClient(
             model_config.select(stages.relations),
@@ -98,7 +98,7 @@ def main() -> int:
             dict.fromkeys(
                 (
                     stages.detection.platform,
-                    stages.road_region.platform,
+                    stages.road_layout.platform,
                     stages.relations.platform,
                     stages.weather.platform,
                 )
@@ -108,16 +108,15 @@ def main() -> int:
             source=arguments.source,
             vlm=platform_names,
         )
-        detector = VlmObjectDetectionClient(detection_vlm_client)
         Pipeline(
             (
                 ObjectDetectionStage(
-                    detector,
+                    detection_vlm_client,
                     min_object_area_ratio=(
                         app_config.object_detection.min_object_area_ratio
                     ),
                 ),
-                RoadLayoutExtractionStage(road_region_vlm_client),
+                RoadLayoutExtractionStage(road_layout_vlm_client),
                 RelationExtractionStage(relations_vlm_client),
                 WeatherExtractionStage(weather_vlm_client),
             )

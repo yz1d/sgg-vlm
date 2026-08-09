@@ -2,15 +2,22 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 import json
-from typing import cast
+from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
-from src.graph._generated.catalog import RELATIONSHIP_TARGETS, STATE_TARGETS
-from src.graph._generated.models import ObjectState, Provenance, Relationship
-from src.graph.ontology import RelationshipTarget, StateTarget
+from src.graph._generated.catalog import OBJECT_ATTRIBUTE_TARGETS, RELATION_TARGETS
+from src.graph._generated.models import (
+    EgoVehicle,
+    ObjectDecision,
+    ObjectProvenance,
+    Provenance,
+    Relation,
+    SceneObject,
+)
+from src.graph.ontology import ObjectAttributeTarget, RelationTarget
 from src.stage import StageOutput
 from src.stages.vlm_helper import (
     build_request_trace,
@@ -21,30 +28,30 @@ from src.stages.vlm_helper import (
 from src.traces import JsonValue, Trace
 
 
-class RelationshipProposal(BaseModel):
+class RelationProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     subject: str
     type: str
 
 
-class ObjectStateProposal(BaseModel):
+class ObjectAttributeProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     subject: str
-    type: str
-    attributes: dict[str, str]
+    name: str
+    value: str
 
 
 class ExtractionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    relationships: list[RelationshipProposal]
-    states: list[ObjectStateProposal]
+    relations: list[RelationProposal]
+    attributes: list[ObjectAttributeProposal]
 
 
 class RelationExtractionStage:
-    """Add schema-defined entity-to-ego relationships and object states."""
+    """Add object-to-ego relations and schema-defined object attributes."""
 
     name = "relation-extraction"
 
@@ -52,37 +59,53 @@ class RelationExtractionStage:
         self.client = client
 
     def run(self, frame: Frame) -> StageOutput:
-        perceived_entities = list(frame.graph.perceived_entities or [])
-        relationship_vocabulary = tuple(
-            target for target in RELATIONSHIP_TARGETS if target.extraction_enabled
+        objects = [
+            object_
+            for object_ in frame.graph.objects
+            if object_.id != "ego" and object_.bbox is not None
+        ]
+        ego = next(
+            (
+                object_
+                for object_ in frame.graph.objects
+                if isinstance(object_, EgoVehicle) and object_.id == "ego"
+            ),
+            None,
         )
-        state_vocabulary = STATE_TARGETS
+        if ego is None:
+            raise ValueError("Scene has no ego object")
+        relation_vocabulary = tuple(
+            target
+            for target in RELATION_TARGETS
+            if target.relation_extraction
+        )
+        attribute_vocabulary = tuple(
+            target
+            for target in OBJECT_ATTRIBUTE_TARGETS
+            if any(isinstance(object_, target.object_model) for object_ in objects)
+        )
         identity_map = render_identity_map(frame)
         registry: list[JsonValue] = [
-            {"id": entity.id, "type": entity.type}
-            for entity in perceived_entities
+            {"id": object_.id, "type": object_.type} for object_ in objects
         ]
         vocabulary = _vocabulary_payload(
-            relationship_vocabulary, state_vocabulary
+            relation_vocabulary, attribute_vocabulary
         )
         prompt = _build_prompt(registry, vocabulary)
         stage_input: dict[str, JsonValue] = {
-            "perceived_entities": registry,
+            "objects": registry,
             "vocabulary": vocabulary,
         }
 
-        if not perceived_entities:
+        if not objects:
             return StageOutput(
                 traces=(
                     Trace.text("prompt.txt", prompt),
                     Trace.json("stage-input.json", stage_input),
-                    Trace.json(
-                        "request.json",
-                        {"skipped": "no perceived road entities"},
-                    ),
+                    Trace.json("request.json", {"skipped": "no visible scene objects"}),
                     Trace.bytes("identity-map.png", identity_map),
-                    Trace.json("relationships.json", []),
-                    Trace.json("states.json", []),
+                    Trace.json("relations.json", []),
+                    Trace.json("object-attributes.json", []),
                 )
             )
 
@@ -90,50 +113,43 @@ class RelationExtractionStage:
             VlmRequest(
                 prompt=prompt,
                 images=build_vlm_images(frame, identity_map),
-                response_schema=cast(
-                    dict[str, JsonValue],
-                    ExtractionResponse.model_json_schema(),
+                response_schema=_response_schema(
+                    objects,
+                    relation_vocabulary,
+                    attribute_vocabulary,
                 ),
             )
         )
         proposals = ExtractionResponse.model_validate(
             parse_vlm_json(response.text)
         )
-        entity_by_id = {
-            entity.id: entity for entity in perceived_entities
-        }
-        relationship_by_name = {
-            target.model.__name__: target for target in relationship_vocabulary
-        }
-        state_by_name = {
-            target.model.__name__: target for target in state_vocabulary
+        object_by_id = {object_.id: object_ for object_ in objects}
+        relation_by_name = {
+            target.model.__name__: target for target in relation_vocabulary
         }
         _validate_proposals(
             proposals,
-            entity_by_id=entity_by_id,
-            relationship_by_name=relationship_by_name,
-            state_by_name=state_by_name,
+            object_by_id=object_by_id,
+            relation_by_name=relation_by_name,
+            attribute_targets=attribute_vocabulary,
         )
 
-        used_relationship_ids = {
-            relationship.id for relationship in frame.graph.relationships or []
-        }
-        relationship_index = 1
-        relationships: list[Relationship] = []
-        states: list[ObjectState] = []
-        normalized_relationships: list[JsonValue] = []
-        for proposal in proposals.relationships:
-            while f"relationship_{relationship_index:03d}" in used_relationship_ids:
-                relationship_index += 1
-            relationship_id = f"relationship_{relationship_index:03d}"
-            used_relationship_ids.add(relationship_id)
-            relationship_index += 1
-            target = relationship_by_name[proposal.type]
-            relationship = target.model.model_validate(
+        used_relation_ids = {relation.id for relation in frame.graph.relations}
+        relation_index = 1
+        relations: list[Relation] = []
+        normalized_relations: list[JsonValue] = []
+        for proposal in proposals.relations:
+            while f"relation_{relation_index:03d}" in used_relation_ids:
+                relation_index += 1
+            relation_id = f"relation_{relation_index:03d}"
+            used_relation_ids.add(relation_id)
+            relation_index += 1
+            target = relation_by_name[proposal.type]
+            relation = target.model.model_validate(
                 {
-                    "id": relationship_id,
+                    "id": relation_id,
                     "subject": proposal.subject,
-                    "object": "ego",
+                    "object": ego.id,
                     "provenance": [
                         Provenance(
                             source="vlm",
@@ -143,39 +159,50 @@ class RelationExtractionStage:
                     ],
                 }
             )
-            relationships.append(relationship)
-            normalized_relationships.append(
+            relations.append(relation)
+            normalized_relations.append(
                 cast(
                     JsonValue,
-                    relationship.model_dump(mode="json", exclude_none=True),
+                    relation.model_dump(mode="json", exclude_none=True),
                 )
             )
 
-        normalized_states: list[JsonValue] = []
-        for proposal in proposals.states:
-            target = state_by_name[proposal.type]
-            state = target.model.model_validate(
+        attribute_values_by_object: dict[str, dict[str, str]] = {}
+        for proposal in proposals.attributes:
+            attribute_values_by_object.setdefault(proposal.subject, {})[
+                proposal.name
+            ] = proposal.value
+
+        updated_objects: list[SceneObject] = []
+        normalized_attributes: list[JsonValue] = []
+        for object_id, attribute_values in attribute_values_by_object.items():
+            object_ = object_by_id[object_id]
+            payload = object_.model_dump(mode="python")
+            payload.update(attribute_values)
+            payload["provenance"] = [
+                *object_.provenance,
+                ObjectProvenance(
+                    source="vlm",
+                    stage=self.name,
+                    model=response.model,
+                    supports=[ObjectDecision.attributes],
+                ),
+            ]
+            updated = type(object_).model_validate(payload)
+            updated_objects.append(updated)
+            normalized_attributes.extend(
                 {
-                    "subject": proposal.subject,
-                    "provenance": [
-                        Provenance(
-                            source="vlm",
-                            stage=self.name,
-                            model=response.model,
-                        )
-                    ],
-                    **proposal.attributes,
+                    "subject": object_id,
+                    "name": name,
+                    "value": value,
                 }
-            )
-            states.append(state)
-            normalized_states.append(
-                cast(JsonValue, state.model_dump(mode="json", exclude_none=True))
+                for name, value in attribute_values.items()
             )
 
         request_trace = build_request_trace(response)
         return StageOutput(
-            relationships=tuple(relationships),
-            states=tuple(states),
+            objects=tuple(updated_objects),
+            relations=tuple(relations),
             traces=(
                 Trace.text("prompt.txt", prompt),
                 Trace.json("stage-input.json", stage_input),
@@ -183,46 +210,42 @@ class RelationExtractionStage:
                 Trace.bytes("identity-map.png", identity_map),
                 Trace.json("response.raw.json", response.raw),
                 Trace.text("response.txt", response.text),
-                Trace.json("relationships.json", normalized_relationships),
-                Trace.json("states.json", normalized_states),
+                Trace.json("relations.json", normalized_relations),
+                Trace.json("object-attributes.json", normalized_attributes),
             ),
         )
 
 
 def _vocabulary_payload(
-    relationships: tuple[RelationshipTarget, ...],
-    states: tuple[StateTarget, ...],
+    relations: tuple[RelationTarget, ...],
+    attributes: tuple[ObjectAttributeTarget, ...],
 ) -> dict[str, JsonValue]:
     return {
-        "relationships": [
-            {
-                "type": target.model.__name__,
-                "description": target.description,
-                "exclusive_group": target.exclusive_group,
-            }
-            for target in relationships
-        ],
-        "states": [
+        "relation_types": [
             {
                 "type": target.model.__name__,
                 "description": target.description,
                 "subject_type": target.subject_model.__name__,
-                "attributes": {
-                    attribute.name: {
-                        "description": attribute.description,
-                        "values": [
-                            {
-                                "value": value.value,
-                                "description": value.description,
-                                "visual_prompt": value.prompt,
-                            }
-                            for value in attribute.values
-                        ],
-                    }
-                    for attribute in target.attributes
-                },
+                "object_type": target.object_model.__name__,
+                "exclusive_group": target.exclusive_group,
             }
-            for target in states
+            for target in relations
+        ],
+        "object_attributes": [
+            {
+                "object_type": target.object_model.__name__,
+                "name": target.name,
+                "description": target.description,
+                "values": [
+                    {
+                        "value": value.value,
+                        "description": value.description,
+                        "visual_prompt": value.prompt,
+                    }
+                    for value in target.values
+                ],
+            }
+            for target in attributes
         ],
     }
 
@@ -230,14 +253,15 @@ def _vocabulary_payload(
 def _build_prompt(
     registry: list[JsonValue], vocabulary: dict[str, JsonValue]
 ) -> str:
-    return f"""Extract clear schema-defined facts for these perceived road entities.
+    return f"""Extract clear schema-defined facts for these visible scene objects.
 
-The first image is original. The second labels perceived road entities. Ego is the camera vehicle.
-Every relationship describes one perceived road entity relative to ego.
-Object states apply only to compatible road-user types in the vocabulary.
-Use only the registry and vocabulary. Return only clear facts.
+The first image is original. The second labels visible scene objects. Ego is the camera vehicle.
+Every relation describes one registry object relative to ego.
+Object attributes apply only to compatible object types in the vocabulary.
+Use only registry IDs, relation types, attribute names, and attribute values from the vocabulary.
+Return only clear visual facts. Omit uncertain attributes and relations.
 
-Perceived-entity registry:
+Scene-object registry:
 {json.dumps(registry, separators=(",", ":"))}
 
 Schema vocabulary:
@@ -248,61 +272,143 @@ Schema vocabulary:
 def _validate_proposals(
     proposals: ExtractionResponse,
     *,
-    entity_by_id: Mapping[str, object],
-    relationship_by_name: dict[str, RelationshipTarget],
-    state_by_name: dict[str, StateTarget],
+    object_by_id: Mapping[str, SceneObject],
+    relation_by_name: dict[str, RelationTarget],
+    attribute_targets: tuple[ObjectAttributeTarget, ...],
 ) -> None:
-    relationship_keys: set[tuple[str, str]] = set()
+    relation_keys: set[tuple[str, str]] = set()
     groups: set[tuple[str, str]] = set()
-    for proposal in proposals.relationships:
-        if proposal.subject not in entity_by_id:
-            raise ValueError(
-                f"Relationship has unknown subject: {proposal.subject}"
-            )
-        target = relationship_by_name.get(proposal.type)
+    for proposal in proposals.relations:
+        object_ = object_by_id.get(proposal.subject)
+        if object_ is None:
+            raise ValueError(f"Relation has unknown subject: {proposal.subject}")
+        target = relation_by_name.get(proposal.type)
         if target is None:
-            raise ValueError(f"Unknown relationship type: {proposal.type}")
+            raise ValueError(f"Unknown relation type: {proposal.type}")
+        if not isinstance(object_, target.subject_model):
+            raise ValueError(
+                f"Relation {proposal.type} does not apply to {object_.type}"
+            )
         key = (proposal.subject, proposal.type)
-        if key in relationship_keys:
-            raise ValueError(f"Duplicate relationship proposal: {key}")
-        relationship_keys.add(key)
+        if key in relation_keys:
+            raise ValueError(f"Duplicate relation proposal: {key}")
+        relation_keys.add(key)
         if target.exclusive_group is not None:
             group_key = (proposal.subject, target.exclusive_group)
             if group_key in groups:
                 raise ValueError(
-                    f"Conflicting {target.exclusive_group} relationships for "
+                    f"Conflicting {target.exclusive_group} relations for "
                     f"{proposal.subject}"
                 )
             groups.add(group_key)
 
-    state_keys: set[tuple[str, str]] = set()
-    for proposal in proposals.states:
-        entity = entity_by_id.get(proposal.subject)
-        if entity is None:
-            raise ValueError(f"Object state has unknown subject: {proposal.subject}")
-        target = state_by_name.get(proposal.type)
-        if target is None:
-            raise ValueError(f"Unknown object-state type: {proposal.type}")
-        if not isinstance(entity, target.subject_model):
+    attribute_keys: set[tuple[str, str]] = set()
+    for proposal in proposals.attributes:
+        object_ = object_by_id.get(proposal.subject)
+        if object_ is None:
             raise ValueError(
-                f"Object state {proposal.type} does not apply to "
-                f"{getattr(entity, 'type', type(entity).__name__)}"
+                f"Object attribute has unknown subject: {proposal.subject}"
             )
-        key = (proposal.subject, proposal.type)
-        if key in state_keys:
-            raise ValueError(f"Duplicate object-state proposal: {key}")
-        state_keys.add(key)
-        expected_attributes = {
-            attribute.name: {value.value for value in attribute.values}
-            for attribute in target.attributes
-        }
-        if set(proposal.attributes) != set(expected_attributes):
+        candidates = [
+            target
+            for target in attribute_targets
+            if target.name == proposal.name
+            and isinstance(object_, target.object_model)
+        ]
+        if len(candidates) != 1:
             raise ValueError(
-                f"Object state {proposal.type} requires attributes "
-                f"{sorted(expected_attributes)}"
+                f"Unknown attribute {proposal.name!r} for {object_.type}"
             )
-        for name, value in proposal.attributes.items():
-            if not isinstance(value, str) or value not in expected_attributes[name]:
-                raise ValueError(
-                    f"Invalid value for {proposal.type}.{name}: {value!r}"
-                )
+        target = candidates[0]
+        valid_values = {value.value for value in target.values}
+        if proposal.value not in valid_values:
+            raise ValueError(
+                f"Invalid value for {object_.type}.{proposal.name}: "
+                f"{proposal.value!r}"
+            )
+        key = (proposal.subject, proposal.name)
+        if key in attribute_keys:
+            raise ValueError(f"Duplicate object attribute proposal: {key}")
+        attribute_keys.add(key)
+
+
+def _response_schema(
+    objects: list[SceneObject],
+    relations: tuple[RelationTarget, ...],
+    attributes: tuple[ObjectAttributeTarget, ...],
+) -> dict[str, JsonValue]:
+    relation_variants: list[dict[str, Any]] = []
+    for target in relations:
+        subjects = [
+            object_.id
+            for object_ in objects
+            if isinstance(object_, target.subject_model)
+        ]
+        if not subjects:
+            continue
+        relation_variants.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "subject": {"type": "string", "enum": subjects},
+                    "type": {
+                        "type": "string",
+                        "enum": [target.model.__name__],
+                    },
+                },
+                "required": ["subject", "type"],
+            }
+        )
+
+    attribute_variants: list[dict[str, Any]] = []
+    for target in attributes:
+        subjects = [
+            object_.id
+            for object_ in objects
+            if isinstance(object_, target.object_model)
+        ]
+        if not subjects:
+            continue
+        attribute_variants.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "subject": {"type": "string", "enum": subjects},
+                    "name": {"type": "string", "enum": [target.name]},
+                    "value": {
+                        "type": "string",
+                        "enum": [value.value for value in target.values],
+                    },
+                },
+                "required": ["subject", "name", "value"],
+            }
+        )
+
+    relation_items: dict[str, Any] = (
+        {"anyOf": relation_variants} if relation_variants else {}
+    )
+    attribute_items: dict[str, Any] = (
+        {"anyOf": attribute_variants} if attribute_variants else {}
+    )
+    return cast(
+        dict[str, JsonValue],
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "relations": {
+                    "type": "array",
+                    "items": relation_items,
+                    **({"maxItems": 0} if not relation_variants else {}),
+                },
+                "attributes": {
+                    "type": "array",
+                    "items": attribute_items,
+                    **({"maxItems": 0} if not attribute_variants else {}),
+                },
+            },
+            "required": ["relations", "attributes"],
+        },
+    )

@@ -10,28 +10,25 @@ from src.graph._generated.models import (
     Cyclist,
     EgoVehicle,
     InFrontOf,
-    InIntersection,
     InLane,
-    Intersection,
     Lane,
+    LeftAdjacentTo,
     LeftOf,
     Motorcycle,
+    Overlaps,
     Pedestrian,
-    PerceivedRoadEntity,
     RightOf,
     RoadBlockage,
-    RoadEntity,
+    SceneObject,
     SchoolBus,
-    StopArmState,
     Truck,
 )
 from src.graph.ontology import (
+    AttributeValue,
     DetectionTarget,
-    RelationshipTarget,
-    RoadRegionTarget,
-    StateAttribute,
-    StateTarget,
-    StateValue,
+    ObjectAttributeTarget,
+    RelationTarget,
+    RoadLayoutTarget,
 )
 
 
@@ -71,95 +68,138 @@ DETECTION_TARGETS = (
 )
 
 
-ROAD_REGION_TARGETS = (
-    RoadRegionTarget(
-        model=Intersection,
-        description='A shared road region where traffic paths meet or cross.',
-        membership_model=InIntersection,
-        id_prefix='intersection',
-    ),
-    RoadRegionTarget(
+ROAD_LAYOUT_TARGETS = (
+    RoadLayoutTarget(
         model=Lane,
-        description='A visible road corridor for one line of traffic, independent of its direction relative to ego.',
+        description="A semantic traffic lane relevant to ego's immediate driving situation.",
         membership_model=InLane,
         id_prefix='lane',
-    ),
-)
-
-
-RELATIONSHIP_TARGETS = (
-    RelationshipTarget(
-        model=Behind,
-        description="The subject is longitudinally behind ego in road coordinates, regardless of the subject's facing or motion direction.",
-        subject_model=PerceivedRoadEntity,
-        object_model=EgoVehicle,
-        exclusive_group='longitudinal',
-        extraction_enabled=True,
-    ),
-    RelationshipTarget(
-        model=InFrontOf,
-        description="The subject is longitudinally ahead of ego in road coordinates, regardless of the subject's facing or motion direction.",
-        subject_model=PerceivedRoadEntity,
-        object_model=EgoVehicle,
-        exclusive_group='longitudinal',
-        extraction_enabled=True,
-    ),
-    RelationshipTarget(
-        model=InIntersection,
-        description="The subject's ground reference point lies in the intersection.",
-        subject_model=RoadEntity,
-        object_model=Intersection,
-        exclusive_group='intersection_membership',
-        extraction_enabled=False,
-    ),
-    RelationshipTarget(
-        model=InLane,
-        description="The subject's ground reference point lies in the lane.",
-        subject_model=RoadEntity,
-        object_model=Lane,
-        exclusive_group='lane_membership',
-        extraction_enabled=False,
-    ),
-    RelationshipTarget(
-        model=LeftOf,
-        description="The subject is laterally left of ego relative to ego's road heading, not merely in the left half of the image.",
-        subject_model=PerceivedRoadEntity,
-        object_model=EgoVehicle,
-        exclusive_group='lateral',
-        extraction_enabled=True,
-    ),
-    RelationshipTarget(
-        model=RightOf,
-        description="The subject is laterally right of ego relative to ego's road heading, not merely in the right half of the image.",
-        subject_model=PerceivedRoadEntity,
-        object_model=EgoVehicle,
-        exclusive_group='lateral',
-        extraction_enabled=True,
-    ),
-)
-
-
-STATE_TARGETS = (
-    StateTarget(
-        model=StopArmState,
-        description="An assertion about a school bus's mounted stop arm.",
-        subject_model=SchoolBus,
         attributes=(
-            StateAttribute(
-                name='value',
-                description='Asserted stop-arm position.',
+            ObjectAttributeTarget(
+                object_model=Lane,
+                name='direction',
+                description="Traffic direction in this lane relative to ego's direction.",
+                required=True,
                 values=(
-                    StateValue(
-                        value='deployed',
-                        description='The stop arm projects outward from the bus.',
-                        prompt='The stop arm is visibly extended outward from the side of the bus.',
+                    AttributeValue(
+                        value='same_as_ego',
+                        description="Traffic travels approximately in ego's direction.",
+                        prompt='Traffic in this lane travels in approximately the same direction as ego.',
                     ),
-                    StateValue(
-                        value='stowed',
-                        description='The stop arm is folded against the bus.',
-                        prompt='The stop arm is visibly folded flat against the side of the bus.',
+                    AttributeValue(
+                        value='opposite_to_ego',
+                        description="Traffic travels approximately opposite ego's direction.",
+                        prompt='Traffic in this lane travels in approximately the opposite direction from ego.',
+                    ),
+                    AttributeValue(
+                        value='crossing',
+                        description="Traffic crosses ego's general direction.",
+                        prompt="Traffic in this lane crosses ego's general direction.",
                     ),
                 ),
+            ),
+        ),
+    ),
+)
+
+
+RELATION_TARGETS = (
+    RelationTarget(
+        model=Behind,
+        description="The subject is longitudinally behind ego in road coordinates, regardless of the subject's facing or motion direction.",
+        subject_model=SceneObject,
+        object_model=EgoVehicle,
+        exclusive_group='longitudinal',
+        relation_extraction=True,
+        road_layout_extraction=False,
+        topology_constraint=None,
+        symmetric=False,
+    ),
+    RelationTarget(
+        model=InFrontOf,
+        description="The subject is longitudinally ahead of ego in road coordinates, regardless of the subject's facing or motion direction.",
+        subject_model=SceneObject,
+        object_model=EgoVehicle,
+        exclusive_group='longitudinal',
+        relation_extraction=True,
+        road_layout_extraction=False,
+        topology_constraint=None,
+        symmetric=False,
+    ),
+    RelationTarget(
+        model=InLane,
+        description="The subject's ground reference point lies in the lane.",
+        subject_model=SceneObject,
+        object_model=Lane,
+        exclusive_group='lane_membership',
+        relation_extraction=False,
+        road_layout_extraction=False,
+        topology_constraint=None,
+        symmetric=False,
+    ),
+    RelationTarget(
+        model=LeftAdjacentTo,
+        description='The subject is directly left of the object in ego-oriented road coordinates, with no physical separator between them.',
+        subject_model=Lane,
+        object_model=Lane,
+        exclusive_group=None,
+        relation_extraction=False,
+        road_layout_extraction=True,
+        topology_constraint='parallel_without_physical_separator',
+        symmetric=False,
+    ),
+    RelationTarget(
+        model=LeftOf,
+        description="The subject is laterally left of ego relative to ego's road heading, not merely in the left half of the image.",
+        subject_model=SceneObject,
+        object_model=EgoVehicle,
+        exclusive_group='lateral',
+        relation_extraction=True,
+        road_layout_extraction=False,
+        topology_constraint=None,
+        symmetric=False,
+    ),
+    RelationTarget(
+        model=Overlaps,
+        description='The subject and object lanes have overlapping traffic paths.',
+        subject_model=Lane,
+        object_model=Lane,
+        exclusive_group=None,
+        relation_extraction=False,
+        road_layout_extraction=True,
+        topology_constraint=None,
+        symmetric=True,
+    ),
+    RelationTarget(
+        model=RightOf,
+        description="The subject is laterally right of ego relative to ego's road heading, not merely in the right half of the image.",
+        subject_model=SceneObject,
+        object_model=EgoVehicle,
+        exclusive_group='lateral',
+        relation_extraction=True,
+        road_layout_extraction=False,
+        topology_constraint=None,
+        symmetric=False,
+    ),
+)
+
+
+OBJECT_ATTRIBUTE_TARGETS = (
+    ObjectAttributeTarget(
+        object_model=SchoolBus,
+        name='stop_arm_position',
+        description='Visible position of the school bus stop arm.',
+        required=False,
+        values=(
+            AttributeValue(
+                value='deployed',
+                description='The stop arm projects outward from the bus.',
+                prompt='The stop arm is visibly extended outward from the side of the bus.',
+            ),
+            AttributeValue(
+                value='stowed',
+                description='The stop arm is folded against the bus.',
+                prompt='The stop arm is visibly folded flat against the side of the bus.',
             ),
         ),
     ),

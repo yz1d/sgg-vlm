@@ -6,7 +6,7 @@ stages:
     platform: qwen
     reasoning:
       mode: disabled
-  road_region:
+  road_layout:
     platform: gemini
     reasoning:
       mode: enabled

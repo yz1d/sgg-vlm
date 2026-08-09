@@ -1,31 +1,54 @@
 from __future__ import annotations
 
-import math
+import json
+from typing import Annotated, Any, cast
 
 from PIL import Image as PillowImage
+from pydantic import BaseModel, ConfigDict, Field
 
-from src.clients.object_detection import ObjectDetectionClient
+from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
 from src.graph._generated.catalog import DETECTION_TARGETS
 from src.graph._generated.models import (
     BoundingBox2D,
-    PerceivedEntityDecision,
-    PerceivedEntityProvenance,
-    PerceivedRoadEntity,
+    ObjectDecision,
+    ObjectProvenance,
+    SceneObject,
 )
 from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
+from src.stages.vlm_helper import (
+    build_original_vlm_image,
+    build_request_trace,
+    parse_vlm_json,
+)
 from src.traces import JsonValue, Trace
 
 
+NormalizedCoordinate = Annotated[float, Field(ge=0, le=1000)]
+
+
+class DetectionProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    label: str
+    bbox: list[NormalizedCoordinate] = Field(min_length=4, max_length=4)
+
+
+class DetectionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    detections: list[DetectionProposal]
+
+
 class ObjectDetectionStage:
-    """Add road entities detected from the frame's primary image."""
+    """Add scene objects detected from the frame's primary image."""
 
     name = "object-detection"
 
     def __init__(
         self,
-        client: ObjectDetectionClient,
+        client: VlmClient,
         *,
         min_object_area_ratio: float = 0.0,
     ) -> None:
@@ -38,39 +61,65 @@ class ObjectDetectionStage:
         targets = DETECTION_TARGETS
         if not targets:
             raise ValueError("The graph schema defines no object-detection prompts")
-        prompts = tuple(target.prompt for target in targets)
-        target_by_prompt = {target.prompt.casefold(): target for target in targets}
-        batch = self.client.detect(frame.image, prompts)
+        labels = tuple(target.prompt for target in targets)
+        if len({label.casefold() for label in labels}) != len(labels):
+            raise ValueError("Object-detection labels must be unique")
+        target_by_label = {target.prompt.casefold(): target for target in targets}
+        prompt = _build_prompt(labels)
+        stage_input: dict[str, JsonValue] = {
+            "labels": list(labels),
+            "coordinate_space": "normalized_0_1000",
+            "min_object_area_ratio": self.min_object_area_ratio,
+        }
+        response = self.client.complete(
+            VlmRequest(
+                prompt=prompt,
+                images=(build_original_vlm_image(frame),),
+                response_schema=_response_schema(labels),
+            )
+        )
+        proposals = DetectionResponse.model_validate(
+            parse_vlm_json(response.text)
+        )
         with PillowImage.open(frame.image.path) as image:
             image_width, image_height = image.size
 
-        used_ids = {
-            entity.id for entity in frame.graph.perceived_entities or []
-        }
+        used_ids = {object_.id for object_ in frame.graph.objects}
         next_id = 1
-        perceived_entities: list[PerceivedRoadEntity] = []
+        objects: list[SceneObject] = []
         annotations: list[BoxAnnotation] = []
         normalized: list[JsonValue] = []
         filtered: list[JsonValue] = []
         clipped_count = 0
         discarded_count = 0
         image_area = image_width * image_height
-        for detection in batch.detections:
-            target = target_by_prompt.get(detection.label.casefold())
+        for proposal in proposals.detections:
+            target = target_by_label.get(proposal.label.strip().casefold())
             if target is None:
                 raise ValueError(
-                    f"Object-detection client returned an unrequested label: "
-                    f"{detection.label!r}"
+                    f"VLM detector returned an unrequested label: {proposal.label!r}"
                 )
+            normalized_bbox = tuple(proposal.bbox)
+            x_min, y_min, x_max, y_max = normalized_bbox
+            if x_min >= x_max or y_min >= y_max:
+                raise ValueError(
+                    f"VLM detector returned an invalid box: {proposal.bbox}"
+                )
+            source_bbox = (
+                x_min * image_width / 1000,
+                y_min * image_height / 1000,
+                x_max * image_width / 1000,
+                y_max * image_height / 1000,
+            )
             bbox = _clip_bbox(
-                detection.bbox_xyxy,
+                source_bbox,
                 width=image_width,
                 height=image_height,
             )
             if bbox is None:
                 discarded_count += 1
                 continue
-            if bbox != detection.bbox_xyxy:
+            if bbox != source_bbox:
                 clipped_count += 1
             area_ratio = (
                 (bbox[2] - bbox[0]) * (bbox[3] - bbox[1]) / image_area
@@ -78,39 +127,33 @@ class ObjectDetectionStage:
             if area_ratio < self.min_object_area_ratio:
                 filtered.append(
                     {
-                        "label": detection.label,
+                        "label": proposal.label,
                         "bbox_xyxy": list(bbox),
                         "area_ratio": area_ratio,
                         "reason": "below_min_object_area_ratio",
-                        **(
-                            {"confidence": detection.confidence}
-                            if detection.confidence is not None
-                            else {}
-                        ),
                     }
                 )
                 continue
 
-            while f"entity_{next_id:03d}" in used_ids:
+            while f"object_{next_id:03d}" in used_ids:
                 next_id += 1
-            entity_id = f"entity_{next_id:03d}"
-            used_ids.add(entity_id)
+            object_id = f"object_{next_id:03d}"
+            used_ids.add(object_id)
             next_id += 1
 
-            provenance = PerceivedEntityProvenance(
-                source="object-detection",
+            provenance = ObjectProvenance(
+                source="vlm",
                 stage=self.name,
-                model=batch.model,
-                source_confidence=detection.confidence,
+                model=response.model,
                 supports=[
-                    PerceivedEntityDecision.existence,
-                    PerceivedEntityDecision.classification,
-                    PerceivedEntityDecision.bounding_box,
+                    ObjectDecision.existence,
+                    ObjectDecision.classification,
+                    ObjectDecision.bounding_box,
                 ],
             )
-            entity = target.model.model_validate(
+            object_ = target.model.model_validate(
                 {
-                    "id": entity_id,
+                    "id": object_id,
                     "bbox": BoundingBox2D(
                         x_min=bbox[0],
                         y_min=bbox[1],
@@ -120,33 +163,21 @@ class ObjectDetectionStage:
                     "provenance": [provenance],
                 }
             )
-            perceived_entities.append(entity)
+            objects.append(object_)
             annotations.append(
                 BoxAnnotation(
                     bbox_xyxy=bbox,
-                    text=(
-                        f"{entity_id} {entity.type}"
-                        + (
-                            f" {detection.confidence:.2f}"
-                            if detection.confidence is not None
-                            else ""
-                        )
-                    ),
-                    color_key=entity.type,
+                    text=f"{object_id} {object_.type}",
+                    color_key=object_.type,
                 )
             )
             normalized.append(
                 {
-                    "entity_id": entity_id,
-                    "type": entity.type,
-                    "label": detection.label,
+                    "object_id": object_id,
+                    "type": object_.type,
+                    "label": proposal.label,
                     "bbox_xyxy": list(bbox),
                     "area_ratio": area_ratio,
-                    **(
-                        {"confidence": detection.confidence}
-                        if detection.confidence is not None
-                        else {}
-                    ),
                 }
             )
 
@@ -158,20 +189,17 @@ class ObjectDetectionStage:
                 f"image={image_width}x{image_height}"
             )
 
-        request: dict[str, JsonValue] = dict(batch.request or {})
-        request.update(
-            {
-                "image": frame.image.path.name,
-                "model": batch.model,
-                "prompts": list(prompts),
-                "min_object_area_ratio": self.min_object_area_ratio,
-            }
-        )
         return StageOutput(
-            perceived_entities=tuple(perceived_entities),
+            objects=tuple(objects),
             traces=(
-                Trace.json("request.json", request),
-                Trace.json("response.raw.json", batch.raw_response),
+                Trace.text("prompt.txt", prompt),
+                Trace.json("stage-input.json", stage_input),
+                Trace.json(
+                    "request.json",
+                    build_request_trace(response, image_roles=("original",)),
+                ),
+                Trace.json("response.raw.json", response.raw),
+                Trace.text("response.txt", response.text),
                 Trace.json("detections.json", normalized),
                 Trace.json("filtered-detections.json", filtered),
                 Trace.bytes(
@@ -182,14 +210,37 @@ class ObjectDetectionStage:
         )
 
 
+def _build_prompt(labels: tuple[str, ...]) -> str:
+    label_json = json.dumps(labels, separators=(",", ":"))
+    return f"""Inspect this front-camera road image and locate every requested scene object.
+
+Use exactly this label vocabulary: {label_json}
+Include small or partly occluded objects when they are visible.
+Classify each physical road user once. Use school bus instead of bus when applicable.
+Treat a blocked road area as one contiguous area unavailable for normal vehicle travel.
+For a blocked road area, box the full area instead of each cone, barrier, worker, or vehicle.
+Use a tight box around the visible extent. Do not infer objects outside the image.
+Return JSON as detections with one label and bbox per object.
+Coordinates use [x_min,y_min,x_max,y_max], normalized from 0 through 1000.
+The top-left image corner is [0,0]. The bottom-right corner is [1000,1000].
+"""
+
+
+def _response_schema(labels: tuple[str, ...]) -> dict[str, JsonValue]:
+    schema = DetectionResponse.model_json_schema()
+    proposal = cast(dict[str, Any], schema["$defs"]["DetectionProposal"])
+    properties = cast(dict[str, Any], proposal["properties"])
+    label_schema = cast(dict[str, Any], properties["label"])
+    label_schema["enum"] = list(labels)
+    return cast(dict[str, JsonValue], schema)
+
+
 def _clip_bbox(
     bbox: tuple[float, float, float, float],
     *,
     width: int,
     height: int,
 ) -> tuple[float, float, float, float] | None:
-    if not all(math.isfinite(coordinate) for coordinate in bbox):
-        return None
     x_min = max(0.0, min(float(width), bbox[0]))
     y_min = max(0.0, min(float(height), bbox[1]))
     x_max = max(0.0, min(float(width), bbox[2]))
