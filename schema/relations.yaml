@@ -1,7 +1,7 @@
-id: https://w3id.org/sgg-vlm/schema/relationships
-name: sgg_vlm_relationships
+id: https://w3id.org/sgg-vlm/schema/relations
+name: sgg_vlm_relations
 version: 0.1.0
-description: Relationships supported by the sgg-vlm scene graph.
+description: Relations supported by the sgg-vlm scene graph.
 
 prefixes:
   linkml: https://w3id.org/linkml/
@@ -11,39 +11,38 @@ default_prefix: sggvlm
 default_range: string
 
 imports:
-  - road_regions
-  - road_entities
+  - objects
 
 classes:
-  Relationship:
-    description: An abstract relationship between two entities in the scene graph.
+  Relation:
+    description: An abstract relation between two objects in the scene graph.
     abstract: true
     attributes:
       id:
-        description: Identity of this relationship within the scene.
+        description: Identity of this relation within the scene.
         identifier: true
         range: string
         required: true
       type:
-        description: Concrete LinkML class of this relationship.
+        description: Concrete LinkML class of this relation.
         designates_type: true
         range: string
         required: true
       provenance:
-        description: Sources that support the relationship assertion.
+        description: Sources that support the relation assertion.
         range: Provenance
         multivalued: true
         inlined_as_list: true
         required: true
 
-  SpatialRelationship:
-    description: An abstract road-coordinate relationship from a perceived road entity to ego.
+  SpatialRelation:
+    description: An abstract road-coordinate relation from a scene object to ego.
     abstract: true
-    is_a: Relationship
+    is_a: Relation
     attributes:
       subject:
-        description: Perceived road entity described relative to ego.
-        range: PerceivedRoadEntity
+        description: Scene object described relative to ego.
+        range: SceneObject
         required: true
       object:
         description: Ego vehicle used as the spatial reference.
@@ -52,60 +51,79 @@ classes:
 
   InFrontOf:
     description: The subject is longitudinally ahead of ego in road coordinates, regardless of the subject's facing or motion direction.
-    is_a: SpatialRelationship
+    is_a: SpatialRelation
     annotations:
       relation_extraction: enabled
       exclusive_group: longitudinal
 
   Behind:
     description: The subject is longitudinally behind ego in road coordinates, regardless of the subject's facing or motion direction.
-    is_a: SpatialRelationship
+    is_a: SpatialRelation
     annotations:
       relation_extraction: enabled
       exclusive_group: longitudinal
 
   LeftOf:
     description: The subject is laterally left of ego relative to ego's road heading, not merely in the left half of the image.
-    is_a: SpatialRelationship
+    is_a: SpatialRelation
     annotations:
       relation_extraction: enabled
       exclusive_group: lateral
 
   RightOf:
     description: The subject is laterally right of ego relative to ego's road heading, not merely in the right half of the image.
-    is_a: SpatialRelationship
+    is_a: SpatialRelation
     annotations:
       relation_extraction: enabled
       exclusive_group: lateral
 
-  RoadRegionRelationship:
-    description: An abstract relationship from a road entity to a road region.
+  RoadObjectRelation:
+    description: An abstract relation from a scene object to a road object.
     abstract: true
-    is_a: Relationship
+    is_a: Relation
     attributes:
       subject:
-        description: Road entity located in the road region.
-        range: RoadEntity
+        description: Scene object located in the road object.
+        range: SceneObject
         required: true
       object:
-        description: Road region that contains the road entity's ground reference point.
-        range: RoadRegion
+        description: Road object that contains the subject's ground reference point.
+        range: RoadObject
         required: true
 
   InLane:
     description: The subject's ground reference point lies in the lane.
-    is_a: RoadRegionRelationship
+    is_a: RoadObjectRelation
     slot_usage:
       object:
         range: Lane
     annotations:
       exclusive_group: lane_membership
 
-  InIntersection:
-    description: The subject's ground reference point lies in the intersection.
-    is_a: RoadRegionRelationship
-    slot_usage:
+  LaneRelation:
+    description: An abstract topological relation between two lanes.
+    abstract: true
+    is_a: Relation
+    attributes:
+      subject:
+        description: Lane from which the topological relation is stated.
+        range: Lane
+        required: true
       object:
-        range: Intersection
+        description: Lane related to the subject lane.
+        range: Lane
+        required: true
+
+  LeftAdjacentTo:
+    description: The subject is directly left of the object when viewed along their shared traffic direction.
+    is_a: LaneRelation
     annotations:
-      exclusive_group: intersection_membership
+      road_layout_extraction: enabled
+      topology_constraint: same_non_crossing_direction
+
+  Overlaps:
+    description: The subject and object lanes have overlapping traffic paths.
+    is_a: LaneRelation
+    annotations:
+      road_layout_extraction: enabled
+      symmetric: enabled
