@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from src.graph._generated.catalog import RELATIONSHIP_TARGETS, STATE_TARGETS
-from src.graph._generated.models import Scene
+from src.graph._generated.catalog import RELATION_TARGETS
+from src.graph._generated.models import EgoVehicle, LaneDirection, Scene
 
 
 class GraphValidationError(ValueError):
@@ -11,105 +11,126 @@ class GraphValidationError(ValueError):
 def validate_scene(graph: Scene) -> None:
     """Validate graph invariants that require comparisons across records."""
 
-    perceived_entities = graph.perceived_entities or []
-    road_regions = graph.road_regions or []
-    states = graph.states or []
-    relationships = graph.relationships or []
+    object_ids = [object_.id for object_ in graph.objects]
+    if len(object_ids) != len(set(object_ids)):
+        raise GraphValidationError("Object IDs must be unique")
 
-    for entity in perceived_entities:
-        bbox = entity.bbox
+    ego_objects = [
+        object_
+        for object_ in graph.objects
+        if isinstance(object_, EgoVehicle) and object_.id == "ego"
+    ]
+    if len(ego_objects) != 1:
+        raise GraphValidationError("The scene must contain exactly one ego object")
+    if any(
+        object_.id == "ego" and not isinstance(object_, EgoVehicle)
+        for object_ in graph.objects
+    ):
+        raise GraphValidationError("Only EgoVehicle can use the ego ID")
+    if ego_objects[0].bbox is not None:
+        raise GraphValidationError("The ego object cannot have an image bounding box")
+
+    for object_ in graph.objects:
+        bbox = object_.bbox
+        if bbox is None:
+            continue
         if bbox.x_min > bbox.x_max or bbox.y_min > bbox.y_max:
             raise GraphValidationError(
-                f"Perceived entity {entity.id} has an invalid bounding box"
+                f"Object {object_.id} has an invalid bounding box"
             )
 
-    perceived_entity_ids = [entity.id for entity in perceived_entities]
-    if len(perceived_entity_ids) != len(set(perceived_entity_ids)):
-        raise GraphValidationError("Perceived-entity IDs must be unique")
-    if "ego" in perceived_entity_ids:
-        raise GraphValidationError(
-            "The reserved ego ID cannot be a perceived entity"
-        )
-    road_region_ids = [road_region.id for road_region in road_regions]
-    if len(road_region_ids) != len(set(road_region_ids)):
-        raise GraphValidationError("Road-region IDs must be unique")
-    entity_ids = ["ego", *perceived_entity_ids, *road_region_ids]
-    if len(entity_ids) != len(set(entity_ids)):
-        raise GraphValidationError("Entity IDs must be unique")
-
-    perceived_entity_by_id = {
-        entity.id: entity for entity in perceived_entities
-    }
-    state_target_by_type = {
-        target.model.__name__: target for target in STATE_TARGETS
-    }
-    state_keys = [(state.subject, state.type) for state in states]
-    if len(state_keys) != len(set(state_keys)):
-        raise GraphValidationError(
-            "Object-state types must be unique for each subject"
-        )
-    for state in states:
-        subject = perceived_entity_by_id.get(state.subject)
-        if subject is None:
-            raise GraphValidationError(
-                f"Object state {state.type} has unknown subject {state.subject}"
-            )
-        target = state_target_by_type[state.type]
-        if not isinstance(subject, target.subject_model):
-            raise GraphValidationError(
-                f"Object state {state.type} requires "
-                f"{target.subject_model.__name__}, got {subject.type}"
-            )
-
-    relationship_ids = [relationship.id for relationship in relationships]
-    if len(relationship_ids) != len(set(relationship_ids)):
-        raise GraphValidationError("Relationship IDs must be unique")
-    relationship_keys = [
-        (relationship.subject, relationship.type, relationship.object)
-        for relationship in relationships
+    relation_ids = [relation.id for relation in graph.relations]
+    if len(relation_ids) != len(set(relation_ids)):
+        raise GraphValidationError("Relation IDs must be unique")
+    relation_keys = [
+        (relation.subject, relation.type, relation.object)
+        for relation in graph.relations
     ]
-    if len(relationship_keys) != len(set(relationship_keys)):
+    if len(relation_keys) != len(set(relation_keys)):
         raise GraphValidationError(
-            "Relationships must be unique by subject, type, and object"
+            "Relations must be unique by subject, type, and object"
         )
-    entity_by_id = {
-        "ego": graph.ego,
-        **perceived_entity_by_id,
-        **{road_region.id: road_region for road_region in road_regions},
+
+    object_by_id = {object_.id: object_ for object_ in graph.objects}
+    target_by_type = {
+        target.model.__name__: target for target in RELATION_TARGETS
     }
-    relationship_target_by_type = {
-        target.model.__name__: target for target in RELATIONSHIP_TARGETS
-    }
-    relationship_groups: set[tuple[str, str]] = set()
-    for relationship in relationships:
-        target = relationship_target_by_type[relationship.type]
-        subject = entity_by_id.get(relationship.subject)
+    relation_groups: set[tuple[str, str]] = set()
+    symmetric_keys: set[tuple[str, str, str]] = set()
+    adjacency_pairs: set[frozenset[str]] = set()
+    right_by_left: dict[str, str] = {}
+    left_by_right: dict[str, str] = {}
+    for relation in graph.relations:
+        target = target_by_type[relation.type]
+        subject = object_by_id.get(relation.subject)
         if subject is None:
             raise GraphValidationError(
-                f"Relationship {relationship.id} has unknown subject "
-                f"{relationship.subject}"
+                f"Relation {relation.id} has unknown subject {relation.subject}"
             )
         if not isinstance(subject, target.subject_model):
             raise GraphValidationError(
-                f"Relationship {relationship.id} requires subject type "
+                f"Relation {relation.id} requires subject type "
                 f"{target.subject_model.__name__}"
             )
-        object_ = entity_by_id.get(relationship.object)
+        object_ = object_by_id.get(relation.object)
         if object_ is None:
             raise GraphValidationError(
-                f"Relationship {relationship.id} has unknown object "
-                f"{relationship.object}"
+                f"Relation {relation.id} has unknown object {relation.object}"
             )
         if not isinstance(object_, target.object_model):
             raise GraphValidationError(
-                f"Relationship {relationship.id} requires object type "
+                f"Relation {relation.id} requires object type "
                 f"{target.object_model.__name__}"
             )
+        if relation.subject == relation.object:
+            raise GraphValidationError(
+                f"Relation {relation.id} cannot reference one object twice"
+            )
         if target.exclusive_group is not None:
-            key = (relationship.subject, target.exclusive_group)
-            if key in relationship_groups:
+            key = (relation.subject, target.exclusive_group)
+            if key in relation_groups:
                 raise GraphValidationError(
-                    f"Entity {relationship.subject} has more than one "
-                    f"{target.exclusive_group} relationship"
+                    f"Object {relation.subject} has more than one "
+                    f"{target.exclusive_group} relation"
                 )
-            relationship_groups.add(key)
+            relation_groups.add(key)
+        if target.symmetric:
+            key = (
+                relation.type,
+                *sorted((relation.subject, relation.object)),
+            )
+            if key in symmetric_keys:
+                raise GraphValidationError(
+                    f"Relation {relation.type} repeats a symmetric object pair"
+                )
+            symmetric_keys.add(key)
+            if relation.subject > relation.object:
+                raise GraphValidationError(
+                    f"Relation {relation.id} does not use canonical endpoint order"
+                )
+        if target.topology_constraint == "parallel_without_physical_separator":
+            subject_direction = getattr(subject, "direction", None)
+            object_direction = getattr(object_, "direction", None)
+            if (
+                subject_direction == LaneDirection.crossing
+                or object_direction == LaneDirection.crossing
+            ):
+                raise GraphValidationError(
+                    f"Relation {relation.id} requires parallel non-crossing lanes"
+                )
+            pair = frozenset((relation.subject, relation.object))
+            if pair in adjacency_pairs:
+                raise GraphValidationError(
+                    f"Lane adjacency repeats pair {sorted(pair)}"
+                )
+            adjacency_pairs.add(pair)
+            if relation.subject in right_by_left:
+                raise GraphValidationError(
+                    f"Lane {relation.subject} has more than one direct right lane"
+                )
+            if relation.object in left_by_right:
+                raise GraphValidationError(
+                    f"Lane {relation.object} has more than one direct left lane"
+                )
+            right_by_left[relation.subject] = relation.object
+            left_by_right[relation.object] = relation.subject

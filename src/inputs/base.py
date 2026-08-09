@@ -5,7 +5,13 @@ from pathlib import Path
 from typing import Protocol
 
 from src.frame import Frame
-from src.graph._generated.models import EgoVehicle, Provenance, Scene
+from src.graph._generated.models import (
+    EgoVehicle,
+    ObjectDecision,
+    ObjectProvenance,
+    Provenance,
+    Scene,
+)
 from src.traces import Trace
 
 
@@ -32,13 +38,15 @@ def empty_scene(*, source: str, timestamp_ns: int | None) -> Scene:
     """Create the valid empty graph shared by raw-image input sources."""
 
     provenance = Provenance(source=source, stage="input")
+    ego_provenance = ObjectProvenance(
+        source=source,
+        stage="input",
+        supports=[ObjectDecision.existence, ObjectDecision.classification],
+    )
     return Scene(
         frame_id="frame_000001",
         timestamp_ns=timestamp_ns,
         provenance=[provenance],
-        ego=EgoVehicle(id="ego", provenance=[provenance]),
-        perceived_entities=[],
-        road_regions=[],
-        states=[],
-        relationships=[],
+        objects=[EgoVehicle(id="ego", provenance=[ego_provenance])],
+        relations=[],
     )

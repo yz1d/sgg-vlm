@@ -115,11 +115,11 @@ classes:
         required: true
 
   LeftAdjacentTo:
-    description: The subject is directly left of the object when viewed along their shared traffic direction.
+    description: The subject is directly left of the object in ego-oriented road coordinates, with no physical separator between them.
     is_a: LaneRelation
     annotations:
       road_layout_extraction: enabled
-      topology_constraint: same_non_crossing_direction
+      topology_constraint: parallel_without_physical_separator
 
   Overlaps:
     description: The subject and object lanes have overlapping traffic paths.

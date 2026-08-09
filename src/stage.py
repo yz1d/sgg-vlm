@@ -5,11 +5,9 @@ from typing import Protocol
 
 from src.frame import Frame
 from src.graph._generated.models import (
-    ObjectState,
-    PerceivedRoadEntity,
-    Relationship,
-    RoadRegion,
+    Relation,
     Scene,
+    SceneObject,
     WeatherCondition,
 )
 from src.traces import Trace
@@ -17,28 +15,41 @@ from src.traces import Trace
 
 @dataclass(frozen=True, slots=True)
 class StageOutput:
-    """Graph additions and non-semantic traces produced by one stage."""
+    """Graph upserts and non-semantic traces produced by one stage."""
 
-    perceived_entities: tuple[PerceivedRoadEntity, ...] = ()
-    road_regions: tuple[RoadRegion, ...] = ()
-    relationships: tuple[Relationship, ...] = ()
-    states: tuple[ObjectState, ...] = ()
+    objects: tuple[SceneObject, ...] = ()
+    relations: tuple[Relation, ...] = ()
     weather: WeatherCondition | None = None
     traces: tuple[Trace, ...] = ()
 
 
 def apply_stage_output(graph: Scene, output: StageOutput) -> Scene:
-    """Create a scene that contains the current records and stage additions."""
+    """Create a scene that contains the current records and stage output."""
+
+    objects = list(graph.objects)
+    object_index = {object_.id: index for index, object_ in enumerate(objects)}
+    output_ids: set[str] = set()
+    for object_ in output.objects:
+        if object_.id in output_ids:
+            raise ValueError(f"Stage output contains duplicate object ID {object_.id}")
+        output_ids.add(object_.id)
+        index = object_index.get(object_.id)
+        if index is None:
+            object_index[object_.id] = len(objects)
+            objects.append(object_)
+            continue
+        current = objects[index]
+        if current.type != object_.type:
+            raise ValueError(
+                f"Stage output cannot change object {object_.id} from "
+                f"{current.type} to {object_.type}"
+            )
+        objects[index] = object_
 
     payload = graph.model_dump(mode="python")
     payload.update(
-        perceived_entities=[
-            *(graph.perceived_entities or []),
-            *output.perceived_entities,
-        ],
-        road_regions=[*(graph.road_regions or []), *output.road_regions],
-        relationships=[*(graph.relationships or []), *output.relationships],
-        states=[*(graph.states or []), *output.states],
+        objects=objects,
+        relations=[*graph.relations, *output.relations],
     )
     if output.weather is not None:
         payload["weather"] = output.weather

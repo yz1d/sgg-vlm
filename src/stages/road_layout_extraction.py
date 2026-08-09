@@ -3,12 +3,20 @@ from __future__ import annotations
 import json
 from typing import Any, cast
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
-from src.graph._generated.catalog import ROAD_REGION_TARGETS
-from src.graph._generated.models import Provenance, Relationship, RoadRegion
+from src.graph._generated.catalog import RELATION_TARGETS, ROAD_LAYOUT_TARGETS
+from src.graph._generated.models import (
+    LaneDirection,
+    ObjectDecision,
+    ObjectProvenance,
+    Provenance,
+    Relation,
+    SceneObject,
+)
+from src.graph.ontology import RelationTarget, RoadLayoutTarget
 from src.stage import StageOutput
 from src.stages.vlm_helper import (
     build_request_trace,
@@ -19,21 +27,32 @@ from src.stages.vlm_helper import (
 from src.traces import JsonValue, Trace
 
 
-class RoadRegionProposal(BaseModel):
+class RoadObjectProposal(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    local_id: str
+    type: str
+    attributes: dict[str, str]
+    occupants: list[str]
+
+
+class LaneRelationProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     type: str
-    occupants: list[str] = Field(min_length=1)
+    subject: str
+    object: str
 
 
 class RoadLayoutResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    road_regions: list[RoadRegionProposal]
+    objects: list[RoadObjectProposal]
+    relations: list[LaneRelationProposal]
 
 
 class RoadLayoutExtractionStage:
-    """Add occupied road regions and ego-relevant traffic-flow facts."""
+    """Add ego-relevant lanes, lane membership, and lane topology."""
 
     name = "road-layout-extraction"
 
@@ -41,37 +60,43 @@ class RoadLayoutExtractionStage:
         self.client = client
 
     def run(self, frame: Frame) -> StageOutput:
-        perceived_entities = list(frame.graph.perceived_entities or [])
         identity_map = render_identity_map(frame)
-        registry: list[JsonValue] = [
-            {"id": "ego", "type": "EgoVehicle"},
-            *(
-                {"id": entity.id, "type": entity.type}
-                for entity in perceived_entities
-            ),
+        registry_objects = [
+            object_
+            for object_ in frame.graph.objects
+            if object_.id == "ego" or object_.bbox is not None
         ]
-        region_vocabulary: list[JsonValue] = [
-            {
-                "type": target.model.__name__,
-                "description": target.description,
-                "membership_type": target.membership_model.__name__,
-            }
-            for target in ROAD_REGION_TARGETS
+        registry: list[JsonValue] = [
+            {"id": object_.id, "type": object_.type}
+            for object_ in registry_objects
         ]
         target_by_name = {
-            target.model.__name__: target for target in ROAD_REGION_TARGETS
+            target.model.__name__: target for target in ROAD_LAYOUT_TARGETS
         }
-        prompt = _build_prompt(registry, region_vocabulary)
+        relation_targets = tuple(
+            target
+            for target in RELATION_TARGETS
+            if target.road_layout_extraction
+        )
+        relation_by_name = {
+            target.model.__name__: target for target in relation_targets
+        }
+        vocabulary = _vocabulary_payload(
+            tuple(target_by_name.values()), relation_targets
+        )
+        prompt = _build_prompt(registry, vocabulary)
         stage_input: dict[str, JsonValue] = {
-            "road_entities": registry,
-            "road_regions": region_vocabulary,
+            "objects": registry,
+            "vocabulary": vocabulary,
         }
 
         response = self.client.complete(
             VlmRequest(
                 prompt=prompt,
                 images=build_vlm_images(frame, identity_map),
-                response_schema=_response_schema(tuple(target_by_name)),
+                response_schema=_response_schema(
+                    tuple(target_by_name.values()), relation_targets
+                ),
             )
         )
         proposals = RoadLayoutResponse.model_validate(
@@ -79,71 +104,82 @@ class RoadLayoutExtractionStage:
         )
         _validate_proposals(
             proposals,
-            known_subjects={
-                "ego",
-                *(entity.id for entity in perceived_entities),
-            },
-            known_region_types=set(target_by_name),
+            known_occupants={object_.id for object_ in registry_objects},
+            target_by_name=target_by_name,
+            relation_by_name=relation_by_name,
         )
 
-        used_region_ids = {
-            road_region.id for road_region in frame.graph.road_regions or []
-        }
-        next_region_index = {name: 1 for name in target_by_name}
-        road_regions: list[RoadRegion] = []
-        relationships: list[Relationship] = []
-        relationship_specs: list[tuple[type[Relationship], str, str]] = []
-        normalized_regions: list[JsonValue] = []
-
-        for proposal in proposals.road_regions:
+        used_object_ids = {object_.id for object_ in frame.graph.objects}
+        next_object_index = {name: 1 for name in target_by_name}
+        local_id_map: dict[str, str] = {}
+        objects: list[SceneObject] = []
+        normalized_objects: list[JsonValue] = []
+        for proposal in proposals.objects:
             target = target_by_name[proposal.type]
             prefix = target.id_prefix
-            index = next_region_index[proposal.type]
-            while f"{prefix}_{index:03d}" in used_region_ids:
+            index = next_object_index[proposal.type]
+            while f"{prefix}_{index:03d}" in used_object_ids:
                 index += 1
-            region_id = f"{prefix}_{index:03d}"
-            next_region_index[proposal.type] = index + 1
-            used_region_ids.add(region_id)
+            object_id = f"{prefix}_{index:03d}"
+            next_object_index[proposal.type] = index + 1
+            used_object_ids.add(object_id)
+            local_id_map[proposal.local_id] = object_id
 
-            road_region = target.model.model_validate(
+            object_ = target.model.model_validate(
                 {
-                    "id": region_id,
+                    "id": object_id,
                     "provenance": [
-                        Provenance(
+                        ObjectProvenance(
                             source="vlm",
                             stage=self.name,
                             model=response.model,
+                            supports=[
+                                ObjectDecision.existence,
+                                ObjectDecision.classification,
+                                ObjectDecision.attributes,
+                            ],
                         )
                     ],
+                    **proposal.attributes,
                 }
             )
-            road_regions.append(road_region)
-            normalized_regions.append(
+            objects.append(object_)
+            normalized_objects.append(
                 cast(
                     JsonValue,
-                    road_region.model_dump(mode="json", exclude_none=True),
+                    object_.model_dump(mode="json", exclude_none=True),
                 )
             )
-            relationship_specs.extend(
-                (target.membership_model, subject, region_id)
-                for subject in proposal.occupants
+
+        relation_specs: list[tuple[type[Relation], str, str]] = []
+        for proposal in proposals.objects:
+            object_id = local_id_map[proposal.local_id]
+            target = target_by_name[proposal.type]
+            relation_specs.extend(
+                (target.membership_model, occupant, object_id)
+                for occupant in proposal.occupants
             )
+        for proposal in proposals.relations:
+            target = relation_by_name[proposal.type]
+            subject = local_id_map[proposal.subject]
+            object_ = local_id_map[proposal.object]
+            if target.symmetric and subject > object_:
+                subject, object_ = object_, subject
+            relation_specs.append((target.model, subject, object_))
 
-        used_relationship_ids = {
-            relationship.id for relationship in frame.graph.relationships or []
-        }
-        relationship_index = 1
-        normalized_relationships: list[JsonValue] = []
-        for relationship_model, subject, object_ in relationship_specs:
-            while f"relationship_{relationship_index:03d}" in used_relationship_ids:
-                relationship_index += 1
-            relationship_id = f"relationship_{relationship_index:03d}"
-            relationship_index += 1
-            used_relationship_ids.add(relationship_id)
-
-            relationship = relationship_model.model_validate(
+        used_relation_ids = {relation.id for relation in frame.graph.relations}
+        relation_index = 1
+        relations: list[Relation] = []
+        normalized_relations: list[JsonValue] = []
+        for relation_model, subject, object_ in relation_specs:
+            while f"relation_{relation_index:03d}" in used_relation_ids:
+                relation_index += 1
+            relation_id = f"relation_{relation_index:03d}"
+            relation_index += 1
+            used_relation_ids.add(relation_id)
+            relation = relation_model.model_validate(
                 {
-                    "id": relationship_id,
+                    "id": relation_id,
                     "subject": subject,
                     "object": object_,
                     "provenance": [
@@ -155,18 +191,18 @@ class RoadLayoutExtractionStage:
                     ],
                 }
             )
-            relationships.append(relationship)
-            normalized_relationships.append(
+            relations.append(relation)
+            normalized_relations.append(
                 cast(
                     JsonValue,
-                    relationship.model_dump(mode="json", exclude_none=True),
+                    relation.model_dump(mode="json", exclude_none=True),
                 )
             )
 
         request_trace = build_request_trace(response)
         return StageOutput(
-            road_regions=tuple(road_regions),
-            relationships=tuple(relationships),
+            objects=tuple(objects),
+            relations=tuple(relations),
             traces=(
                 Trace.text("prompt.txt", prompt),
                 Trace.json("stage-input.json", stage_input),
@@ -174,56 +210,256 @@ class RoadLayoutExtractionStage:
                 Trace.bytes("identity-map.png", identity_map),
                 Trace.json("response.raw.json", response.raw),
                 Trace.text("response.txt", response.text),
-                Trace.json("road-regions.json", normalized_regions),
-                Trace.json("relationships.json", normalized_relationships),
+                Trace.json("lanes.json", normalized_objects),
+                Trace.json("relations.json", normalized_relations),
             ),
         )
 
 
+def _vocabulary_payload(
+    object_targets: tuple[RoadLayoutTarget, ...],
+    relation_targets: tuple[RelationTarget, ...],
+) -> dict[str, JsonValue]:
+    return {
+        "object_types": [
+            {
+                "type": target.model.__name__,
+                "description": target.description,
+                "attributes": {
+                    attribute.name: {
+                        "description": attribute.description,
+                        "required": attribute.required,
+                        "values": [
+                            {
+                                "value": value.value,
+                                "description": value.description,
+                                "visual_prompt": value.prompt,
+                            }
+                            for value in attribute.values
+                        ],
+                    }
+                    for attribute in target.attributes
+                },
+            }
+            for target in object_targets
+        ],
+        "relation_types": [
+            {
+                "type": target.model.__name__,
+                "description": target.description,
+                "topology_constraint": target.topology_constraint,
+                "symmetric": target.symmetric,
+            }
+            for target in relation_targets
+        ],
+    }
+
+
 def _build_prompt(
-    registry: list[JsonValue], region_vocabulary: list[JsonValue]
+    registry: list[JsonValue], vocabulary: dict[str, JsonValue]
 ) -> str:
-    return f"""Identify occupied road regions from the schema vocabulary.
+    return f"""Extract the local lane topology relevant to ego.
 
-The first image is original. The second labels perceived road entities. Ego is the camera vehicle.
-Use registry IDs only. Group road entities that occupy the same region.
-Return only clear facts.
+The first image is original. The second labels visible scene objects. Ego is the camera vehicle.
+Create a short local ID for each lane. Use those local IDs in lane relations.
+Include ego's lane and lanes relevant to ego's immediate driving situation.
+An unoccupied lane can have an empty occupants list.
+Use LeftAdjacentTo for parallel lanes with no physical separator between them.
+Painted lane lines and painted centerlines do not block adjacency.
+Medians, barriers, curbs, grass strips, and substantial unpaved gaps block adjacency.
+Opposing lanes can be adjacent when only paint separates them.
+Use Overlaps for crossing traffic paths. Emit each overlap pair once.
+Use only registry IDs as occupants. Return only clear facts.
 
-Road-entity registry:
+Scene-object registry:
 {json.dumps(registry, separators=(",", ":"))}
 
-Road-region vocabulary:
-{json.dumps(region_vocabulary, separators=(",", ":"))}
+Schema vocabulary:
+{json.dumps(vocabulary, separators=(",", ":"))}
 """
 
 
 def _validate_proposals(
     proposals: RoadLayoutResponse,
     *,
-    known_subjects: set[str],
-    known_region_types: set[str],
+    known_occupants: set[str],
+    target_by_name: dict[str, RoadLayoutTarget],
+    relation_by_name: dict[str, RelationTarget],
 ) -> None:
-    membership_keys: set[tuple[str, str]] = set()
-    for region in proposals.road_regions:
-        if region.type not in known_region_types:
-            raise ValueError(f"Unknown road-region type: {region.type}")
-        for subject in region.occupants:
-            if subject not in known_subjects:
+    proposal_by_local_id: dict[str, RoadObjectProposal] = {}
+    occupant_lanes: dict[str, str] = {}
+    for proposal in proposals.objects:
+        if proposal.local_id in proposal_by_local_id:
+            raise ValueError(f"Duplicate local lane ID: {proposal.local_id}")
+        proposal_by_local_id[proposal.local_id] = proposal
+        target = target_by_name.get(proposal.type)
+        if target is None:
+            raise ValueError(f"Unknown road-layout object type: {proposal.type}")
+        expected_attributes = {
+            attribute.name: attribute for attribute in target.attributes
+        }
+        required_attributes = {
+            name for name, attribute in expected_attributes.items() if attribute.required
+        }
+        if not required_attributes.issubset(proposal.attributes):
+            raise ValueError(
+                f"{proposal.type} requires attributes {sorted(required_attributes)}"
+            )
+        if not set(proposal.attributes).issubset(expected_attributes):
+            raise ValueError(
+                f"{proposal.type} has unknown attributes "
+                f"{sorted(set(proposal.attributes) - set(expected_attributes))}"
+            )
+        for name, value in proposal.attributes.items():
+            valid_values = {
+                item.value for item in expected_attributes[name].values
+            }
+            if value not in valid_values:
                 raise ValueError(
-                    f"Road-region membership has unknown subject: {subject}"
+                    f"Invalid value for {proposal.type}.{name}: {value!r}"
                 )
-            key = (subject, region.type)
-            if key in membership_keys:
+        if len(proposal.occupants) != len(set(proposal.occupants)):
+            raise ValueError(
+                f"Lane {proposal.local_id} contains duplicate occupants"
+            )
+        for occupant in proposal.occupants:
+            if occupant not in known_occupants:
+                raise ValueError(f"Lane has unknown occupant: {occupant}")
+            previous = occupant_lanes.get(occupant)
+            if previous is not None:
                 raise ValueError(
-                    f"Road entity {subject} occupies more than one {region.type}"
+                    f"Object {occupant} occupies both {previous} and "
+                    f"{proposal.local_id}"
                 )
-            membership_keys.add(key)
+            occupant_lanes[occupant] = proposal.local_id
+
+    if occupant_lanes.get("ego") is None:
+        raise ValueError("Road layout must place ego in exactly one lane")
+
+    relation_keys: set[tuple[str, str, str]] = set()
+    symmetric_keys: set[tuple[str, str, str]] = set()
+    right_by_left: dict[str, str] = {}
+    left_by_right: dict[str, str] = {}
+    for proposal in proposals.relations:
+        target = relation_by_name.get(proposal.type)
+        if target is None:
+            raise ValueError(f"Unknown lane relation type: {proposal.type}")
+        subject = proposal_by_local_id.get(proposal.subject)
+        object_ = proposal_by_local_id.get(proposal.object)
+        if subject is None or object_ is None:
+            raise ValueError(
+                f"Lane relation {proposal.type} has an unknown endpoint"
+            )
+        if proposal.subject == proposal.object:
+            raise ValueError(f"Lane relation {proposal.type} cannot reference itself")
+        key = (proposal.type, proposal.subject, proposal.object)
+        if key in relation_keys:
+            raise ValueError(f"Duplicate lane relation: {key}")
+        relation_keys.add(key)
+        if target.symmetric:
+            symmetric_key = (
+                proposal.type,
+                *sorted((proposal.subject, proposal.object)),
+            )
+            if symmetric_key in symmetric_keys:
+                raise ValueError(f"Duplicate symmetric lane relation: {symmetric_key}")
+            symmetric_keys.add(symmetric_key)
+        if target.topology_constraint == "parallel_without_physical_separator":
+            subject_direction = subject.attributes.get("direction")
+            object_direction = object_.attributes.get("direction")
+            if (
+                subject_direction == LaneDirection.crossing.value
+                or object_direction == LaneDirection.crossing.value
+            ):
+                raise ValueError(
+                    f"{proposal.type} requires parallel non-crossing lanes"
+                )
+            previous_right = right_by_left.get(proposal.subject)
+            if previous_right is not None:
+                raise ValueError(
+                    f"Lane {proposal.subject} has more than one direct right lane"
+                )
+            previous_left = left_by_right.get(proposal.object)
+            if previous_left is not None:
+                raise ValueError(
+                    f"Lane {proposal.object} has more than one direct left lane"
+                )
+            right_by_left[proposal.subject] = proposal.object
+            left_by_right[proposal.object] = proposal.subject
 
 
-def _response_schema(region_types: tuple[str, ...]) -> dict[str, JsonValue]:
-    schema = RoadLayoutResponse.model_json_schema()
-    proposal = cast(dict[str, Any], schema["$defs"]["RoadRegionProposal"])
-    properties = cast(dict[str, Any], proposal["properties"])
-    type_schema = cast(dict[str, Any], properties["type"])
-    type_schema["enum"] = list(region_types)
-    return cast(dict[str, JsonValue], schema)
+def _response_schema(
+    object_targets: tuple[RoadLayoutTarget, ...],
+    relation_targets: tuple[RelationTarget, ...],
+) -> dict[str, JsonValue]:
+    object_variants: list[dict[str, Any]] = []
+    for target in object_targets:
+        attribute_properties = {
+            attribute.name: {
+                "type": "string",
+                "enum": [value.value for value in attribute.values],
+            }
+            for attribute in target.attributes
+        }
+        required_attributes = [
+            attribute.name for attribute in target.attributes if attribute.required
+        ]
+        object_variants.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "local_id": {"type": "string", "minLength": 1},
+                    "type": {
+                        "type": "string",
+                        "enum": [target.model.__name__],
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": attribute_properties,
+                        "required": required_attributes,
+                    },
+                    "occupants": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "uniqueItems": True,
+                    },
+                },
+                "required": ["local_id", "type", "attributes", "occupants"],
+            }
+        )
+    relation_variants = [
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "type": {
+                    "type": "string",
+                    "enum": [target.model.__name__],
+                },
+                "subject": {"type": "string"},
+                "object": {"type": "string"},
+            },
+            "required": ["type", "subject", "object"],
+        }
+        for target in relation_targets
+    ]
+    return cast(
+        dict[str, JsonValue],
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "objects": {
+                    "type": "array",
+                    "items": {"anyOf": object_variants},
+                },
+                "relations": {
+                    "type": "array",
+                    "items": {"anyOf": relation_variants},
+                },
+            },
+            "required": ["objects", "relations"],
+        },
+    )

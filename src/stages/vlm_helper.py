@@ -10,7 +10,7 @@ from src.traces import JsonValue
 
 
 def render_identity_map(frame: Frame) -> bytes:
-    """Render stable perceived-entity identifiers over the primary image."""
+    """Render stable scene-object identifiers over the primary image."""
 
     return render_box_overlay(
         frame.image,
@@ -25,7 +25,8 @@ def render_identity_map(frame: Frame) -> bytes:
                 text=entity.id,
                 color_key=entity.type,
             )
-            for entity in frame.graph.perceived_entities or []
+            for entity in frame.graph.objects
+            if entity.bbox is not None
         ],
     )
 

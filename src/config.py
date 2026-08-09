@@ -47,7 +47,7 @@ class StageModelsConfig(BaseModel):
     model_config = ConfigDict(extra="forbid", frozen=True)
 
     detection: StageModelConfig
-    road_region: StageModelConfig
+    road_layout: StageModelConfig
     relations: StageModelConfig
     weather: StageModelConfig
 

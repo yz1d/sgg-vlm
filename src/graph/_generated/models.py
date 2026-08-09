@@ -98,31 +98,53 @@ class WeatherCondition(str, Enum):
     """
 
 
-class PerceivedEntityDecision(str, Enum):
+class ObjectDecision(str, Enum):
     """
-    A decision bundled into a perceived entity record.
+    A decision bundled into an object record.
     """
     existence = "existence"
     """
-    The entity exists in the scene.
+    The object exists in the scene.
     """
     classification = "classification"
     """
-    The entity has the selected concrete type.
+    The object has the selected concrete type.
     """
     bounding_box = "bounding_box"
     """
-    The entity occupies the selected image bounding box.
+    The object occupies the selected image bounding box.
     """
     tracking = "tracking"
     """
-    The entity has the selected cross-frame track identity.
+    The object has the selected cross-frame track identity.
+    """
+    attributes = "attributes"
+    """
+    The object has the selected object-specific attribute values.
     """
 
 
-class StopArmStateValue(str, Enum):
+class LaneDirection(str, Enum):
     """
-    Supported positions of a school bus's mounted stop arm.
+    Traffic direction in a lane relative to ego's direction.
+    """
+    same_as_ego = "same_as_ego"
+    """
+    Traffic travels approximately in ego's direction.
+    """
+    opposite_to_ego = "opposite_to_ego"
+    """
+    Traffic travels approximately opposite ego's direction.
+    """
+    crossing = "crossing"
+    """
+    Traffic crosses ego's general direction.
+    """
+
+
+class StopArmPosition(str, Enum):
+    """
+    Supported positions of a school bus stop arm.
     """
     deployed = "deployed"
     """
@@ -155,296 +177,312 @@ class BoundingBox2D(ConfiguredBaseModel):
     y_max: float = Field(default=..., description="""Maximum vertical pixel coordinate.""", ge=0)
 
 
-class PerceivedEntityProvenance(Provenance):
+class ObjectProvenance(Provenance):
     """
-    Provenance identifying the parts of a perceived entity record supported by a source.
+    Provenance that identifies the parts of an object record supported by a source.
     """
-    supports: list[PerceivedEntityDecision] = Field(default=..., description="""Decisions in the perceived entity record supported by this source.""")
+    supports: list[ObjectDecision] = Field(default=..., description="""Decisions in the object record supported by this source.""")
     source: str = Field(default=..., description="""Dataset, model, or algorithm that produced the decision.""")
     stage: str = Field(default=..., description="""Pipeline stage that added the decision to the normalized graph.""")
     model: Optional[str] = Field(default=None, description="""Exact model identifier when the source is a model.""")
     source_confidence: Optional[float] = Field(default=None, description="""Confidence reported by this source for its decision.""", ge=0, le=1)
 
 
-class RoadEntity(ConfiguredBaseModel):
+class SceneObject(ConfiguredBaseModel):
     """
-    An entity that occupies or affects road space in the scene.
+    An object represented in the scene graph.
     """
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["RoadEntity"] = Field(default="RoadEntity", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["SceneObject"] = Field(default="SceneObject", description="""Concrete LinkML class of this object.""")
+    bbox: Optional[BoundingBox2D] = Field(default=None, description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class EgoVehicle(RoadEntity):
+class PotentiallyMovingObject(SceneObject):
     """
-    The observing vehicle and reference frame for spatial relationships.
+    An object that can move or has moved and is relevant to the driving scene.
     """
-    provenance: list[Provenance] = Field(default=..., description="""Source establishing ego for this scene.""")
-    id: Literal["ego"] = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["EgoVehicle"] = Field(default="EgoVehicle", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["PotentiallyMovingObject"] = Field(default="PotentiallyMovingObject", description="""Concrete LinkML class of this object.""")
+    bbox: Optional[BoundingBox2D] = Field(default=None, description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class PerceivedRoadEntity(RoadEntity):
+class EgoVehicle(PotentiallyMovingObject):
     """
-    A non-ego road entity localized in the input image.
+    The observing vehicle and reference object for spatial relations.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["PerceivedRoadEntity"] = Field(default="PerceivedRoadEntity", description="""Concrete LinkML class of this road entity.""")
+    id: Literal["ego"] = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["EgoVehicle"] = Field(default="EgoVehicle", description="""Concrete LinkML class of this object.""")
+    bbox: Optional[BoundingBox2D] = Field(default=None, description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class PerceivedRoadUser(PerceivedRoadEntity):
+class RoadUser(PotentiallyMovingObject):
     """
-    A perceived traffic participant localized in the input image.
+    A visible traffic participant localized in the input image.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["PerceivedRoadUser"] = Field(default="PerceivedRoadUser", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["RoadUser"] = Field(default="RoadUser", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class RoadBlockage(PerceivedRoadEntity):
+class Vehicle(RoadUser):
     """
-    A contiguous visible road area unavailable for normal vehicle travel, independent of the objects or condition that causes it.
+    An abstract motor vehicle.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["RoadBlockage"] = Field(default="RoadBlockage", description="""Concrete LinkML class of this road entity.""")
-
-
-class Vehicle(PerceivedRoadUser):
-    """
-    An abstract perceived motor vehicle.
-    """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["Vehicle"] = Field(default="Vehicle", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Vehicle"] = Field(default="Vehicle", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
 class Car(Vehicle):
     """
     A passenger car.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["Car"] = Field(default="Car", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Car"] = Field(default="Car", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
 class Truck(Vehicle):
     """
     A truck.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["Truck"] = Field(default="Truck", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Truck"] = Field(default="Truck", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
 class Bus(Vehicle):
     """
     A passenger bus that is not necessarily a school bus.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["Bus"] = Field(default="Bus", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Bus"] = Field(default="Bus", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
 class SchoolBus(Bus):
     """
     A bus used to transport students.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["SchoolBus"] = Field(default="SchoolBus", description="""Concrete LinkML class of this road entity.""")
+    stop_arm_position: Optional[StopArmPosition] = Field(default=None, description="""Visible position of the school bus stop arm.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["SchoolBus"] = Field(default="SchoolBus", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
 class Motorcycle(Vehicle):
     """
     A motorcycle.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["Motorcycle"] = Field(default="Motorcycle", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Motorcycle"] = Field(default="Motorcycle", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Cyclist(PerceivedRoadUser):
+class Cyclist(RoadUser):
     """
     A person riding a bicycle.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["Cyclist"] = Field(default="Cyclist", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Cyclist"] = Field(default="Cyclist", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Pedestrian(PerceivedRoadUser):
+class Pedestrian(RoadUser):
     """
     A person traveling on foot.
     """
-    bbox: BoundingBox2D = Field(default=..., description="""Image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical entity.""")
-    provenance: list[PerceivedEntityProvenance] = Field(default=..., description="""Sources supporting the existence, classification, bounding box, or tracking decisions.""")
-    id: str = Field(default=..., description="""Identity used to reference this road entity within the scene.""")
-    type: Literal["Pedestrian"] = Field(default="Pedestrian", description="""Concrete LinkML class of this road entity.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Pedestrian"] = Field(default="Pedestrian", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class ObjectState(ConfiguredBaseModel):
+class RoadObject(SceneObject):
     """
-    An abstract provenance-carrying state observed on a perceived road user.
+    A road surface, road limitation, or road structure represented in the scene.
     """
-    type: Literal["ObjectState"] = Field(default="ObjectState", description="""Concrete LinkML class of this object state.""")
-    subject: str = Field(default=..., description="""Perceived road user whose state is being described.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources supporting the state assertion.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["RoadObject"] = Field(default="RoadObject", description="""Concrete LinkML class of this object.""")
+    bbox: Optional[BoundingBox2D] = Field(default=None, description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class StopArmState(ObjectState):
+class RoadBlockage(RoadObject):
     """
-    An assertion about a school bus's mounted stop arm.
+    A contiguous visible road area unavailable for normal vehicle travel.
     """
-    value: StopArmStateValue = Field(default=..., description="""Asserted stop-arm position.""")
-    type: Literal["StopArmState"] = Field(default="StopArmState", description="""Concrete LinkML class of this object state.""")
-    subject: str = Field(default=..., description="""Perceived road user whose state is being described.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources supporting the state assertion.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["RoadBlockage"] = Field(default="RoadBlockage", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class RoadRegion(ConfiguredBaseModel):
+class Lane(RoadObject):
     """
-    An image-derived road surface region represented in the scene graph.
+    A semantic traffic lane relevant to ego's immediate driving situation.
     """
-    id: str = Field(default=..., description="""Identity used to reference this road region within the scene.""")
-    type: Literal["RoadRegion"] = Field(default="RoadRegion", description="""Concrete LinkML class of this road region.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the existence and classification of this road region.""")
+    direction: LaneDirection = Field(default=..., description="""Traffic direction in this lane relative to ego's direction.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Lane"] = Field(default="Lane", description="""Concrete LinkML class of this object.""")
+    bbox: Optional[BoundingBox2D] = Field(default=None, description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Lane(RoadRegion):
+class StaticObject(SceneObject):
     """
-    A visible road corridor for one line of traffic, independent of its direction relative to ego.
+    A fixed landmark, traffic sign, sign board, or traffic light.
     """
-    id: str = Field(default=..., description="""Identity used to reference this road region within the scene.""")
-    type: Literal["Lane"] = Field(default="Lane", description="""Concrete LinkML class of this road region.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the existence and classification of this road region.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["StaticObject"] = Field(default="StaticObject", description="""Concrete LinkML class of this object.""")
+    bbox: Optional[BoundingBox2D] = Field(default=None, description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Intersection(RoadRegion):
+class Relation(ConfiguredBaseModel):
     """
-    A shared road region where traffic paths meet or cross.
+    An abstract relation between two objects in the scene graph.
     """
-    id: str = Field(default=..., description="""Identity used to reference this road region within the scene.""")
-    type: Literal["Intersection"] = Field(default="Intersection", description="""Concrete LinkML class of this road region.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the existence and classification of this road region.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["Relation"] = Field(default="Relation", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class Relationship(ConfiguredBaseModel):
+class SpatialRelation(Relation):
     """
-    An abstract relationship between two entities in the scene graph.
+    An abstract road-coordinate relation from a scene object to ego.
     """
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["Relationship"] = Field(default="Relationship", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
-
-
-class SpatialRelationship(Relationship):
-    """
-    An abstract road-coordinate relationship from a perceived road entity to ego.
-    """
-    subject: str = Field(default=..., description="""Perceived road entity described relative to ego.""")
+    subject: str = Field(default=..., description="""Scene object described relative to ego.""")
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["SpatialRelationship"] = Field(default="SpatialRelationship", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["SpatialRelation"] = Field(default="SpatialRelation", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class InFrontOf(SpatialRelationship):
+class InFrontOf(SpatialRelation):
     """
     The subject is longitudinally ahead of ego in road coordinates, regardless of the subject's facing or motion direction.
     """
-    subject: str = Field(default=..., description="""Perceived road entity described relative to ego.""")
+    subject: str = Field(default=..., description="""Scene object described relative to ego.""")
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["InFrontOf"] = Field(default="InFrontOf", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["InFrontOf"] = Field(default="InFrontOf", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class Behind(SpatialRelationship):
+class Behind(SpatialRelation):
     """
     The subject is longitudinally behind ego in road coordinates, regardless of the subject's facing or motion direction.
     """
-    subject: str = Field(default=..., description="""Perceived road entity described relative to ego.""")
+    subject: str = Field(default=..., description="""Scene object described relative to ego.""")
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["Behind"] = Field(default="Behind", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["Behind"] = Field(default="Behind", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class LeftOf(SpatialRelationship):
+class LeftOf(SpatialRelation):
     """
     The subject is laterally left of ego relative to ego's road heading, not merely in the left half of the image.
     """
-    subject: str = Field(default=..., description="""Perceived road entity described relative to ego.""")
+    subject: str = Field(default=..., description="""Scene object described relative to ego.""")
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["LeftOf"] = Field(default="LeftOf", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["LeftOf"] = Field(default="LeftOf", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class RightOf(SpatialRelationship):
+class RightOf(SpatialRelation):
     """
     The subject is laterally right of ego relative to ego's road heading, not merely in the right half of the image.
     """
-    subject: str = Field(default=..., description="""Perceived road entity described relative to ego.""")
+    subject: str = Field(default=..., description="""Scene object described relative to ego.""")
     object: str = Field(default=..., description="""Ego vehicle used as the spatial reference.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["RightOf"] = Field(default="RightOf", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["RightOf"] = Field(default="RightOf", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class RoadRegionRelationship(Relationship):
+class RoadObjectRelation(Relation):
     """
-    An abstract relationship from a road entity to a road region.
+    An abstract relation from a scene object to a road object.
     """
-    subject: str = Field(default=..., description="""Road entity located in the road region.""")
-    object: str = Field(default=..., description="""Road region that contains the road entity's ground reference point.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["RoadRegionRelationship"] = Field(default="RoadRegionRelationship", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    subject: str = Field(default=..., description="""Scene object located in the road object.""")
+    object: str = Field(default=..., description="""Road object that contains the subject's ground reference point.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["RoadObjectRelation"] = Field(default="RoadObjectRelation", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class InLane(RoadRegionRelationship):
+class InLane(RoadObjectRelation):
     """
     The subject's ground reference point lies in the lane.
     """
-    subject: str = Field(default=..., description="""Road entity located in the road region.""")
-    object: str = Field(default=..., description="""Road region that contains the road entity's ground reference point.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["InLane"] = Field(default="InLane", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    subject: str = Field(default=..., description="""Scene object located in the road object.""")
+    object: str = Field(default=..., description="""Road object that contains the subject's ground reference point.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["InLane"] = Field(default="InLane", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
-class InIntersection(RoadRegionRelationship):
+class LaneRelation(Relation):
     """
-    The subject's ground reference point lies in the intersection.
+    An abstract topological relation between two lanes.
     """
-    subject: str = Field(default=..., description="""Road entity located in the road region.""")
-    object: str = Field(default=..., description="""Road region that contains the road entity's ground reference point.""")
-    id: str = Field(default=..., description="""Identity of this relationship within the scene.""")
-    type: Literal["InIntersection"] = Field(default="InIntersection", description="""Concrete LinkML class of this relationship.""")
-    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relationship assertion.""")
+    subject: str = Field(default=..., description="""Lane from which the topological relation is stated.""")
+    object: str = Field(default=..., description="""Lane related to the subject lane.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["LaneRelation"] = Field(default="LaneRelation", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
+
+
+class LeftAdjacentTo(LaneRelation):
+    """
+    The subject is directly left of the object in ego-oriented road coordinates, with no physical separator between them.
+    """
+    subject: str = Field(default=..., description="""Lane from which the topological relation is stated.""")
+    object: str = Field(default=..., description="""Lane related to the subject lane.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["LeftAdjacentTo"] = Field(default="LeftAdjacentTo", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
+
+
+class Overlaps(LaneRelation):
+    """
+    The subject and object lanes have overlapping traffic paths.
+    """
+    subject: str = Field(default=..., description="""Lane from which the topological relation is stated.""")
+    object: str = Field(default=..., description="""Lane related to the subject lane.""")
+    id: str = Field(default=..., description="""Identity of this relation within the scene.""")
+    type: Literal["Overlaps"] = Field(default="Overlaps", description="""Concrete LinkML class of this relation.""")
+    provenance: list[Provenance] = Field(default=..., description="""Sources that support the relation assertion.""")
 
 
 class Scene(ConfiguredBaseModel):
@@ -454,24 +492,20 @@ class Scene(ConfiguredBaseModel):
     frame_id: str = Field(default=..., description="""Frame-local identifier assigned by the input stage.""")
     timestamp_ns: Optional[int] = Field(default=None, description="""Optional source timestamp in nanoseconds.""", ge=0)
     provenance: list[Provenance] = Field(default=..., description="""Sources that contributed the frame represented by this scene.""")
-    ego: EgoVehicle = Field(default=..., description="""The observing vehicle, which is not represented by an image bounding box.""")
     weather: Optional[WeatherCondition] = Field(default=None, description="""Visible atmospheric condition for this scene.""")
-    perceived_entities: Optional[list[Annotated[Union[Bus,Car,Cyclist,Motorcycle,Pedestrian,RoadBlockage,SchoolBus,Truck], Field(discriminator="type")]]] = Field(default=None, description="""Non-ego road entities perceived in the frame.""")
-    road_regions: Optional[list[Annotated[Union[Intersection,Lane], Field(discriminator="type")]]] = Field(default=None, description="""Road regions perceived in the frame.""")
-    states: Optional[list[StopArmState]] = Field(default=None, description="""States observed on perceived road users in this frame.""")
-    relationships: Optional[list[Annotated[Union[Behind,InFrontOf,InIntersection,InLane,LeftOf,RightOf], Field(discriminator="type")]]] = Field(default=None, description="""Relationships between entities represented in the scene.""")
+    objects: list[Annotated[Union[Bus,Car,Cyclist,EgoVehicle,Lane,Motorcycle,Pedestrian,RoadBlockage,SchoolBus,Truck], Field(discriminator="type")]] = Field(default=..., description="""Potentially moving, road, and static objects represented in the scene.""")
+    relations: list[Annotated[Union[Behind,InFrontOf,InLane,LeftAdjacentTo,LeftOf,Overlaps,RightOf], Field(discriminator="type")]] = Field(default=..., description="""Relations between objects represented in the scene.""")
 
 
 # Model rebuild
 # see https://pydantic-docs.helpmanual.io/usage/models/#rebuilding-a-model
 Provenance.model_rebuild()
 BoundingBox2D.model_rebuild()
-PerceivedEntityProvenance.model_rebuild()
-RoadEntity.model_rebuild()
+ObjectProvenance.model_rebuild()
+SceneObject.model_rebuild()
+PotentiallyMovingObject.model_rebuild()
 EgoVehicle.model_rebuild()
-PerceivedRoadEntity.model_rebuild()
-PerceivedRoadUser.model_rebuild()
-RoadBlockage.model_rebuild()
+RoadUser.model_rebuild()
 Vehicle.model_rebuild()
 Car.model_rebuild()
 Truck.model_rebuild()
@@ -480,18 +514,19 @@ SchoolBus.model_rebuild()
 Motorcycle.model_rebuild()
 Cyclist.model_rebuild()
 Pedestrian.model_rebuild()
-ObjectState.model_rebuild()
-StopArmState.model_rebuild()
-RoadRegion.model_rebuild()
+RoadObject.model_rebuild()
+RoadBlockage.model_rebuild()
 Lane.model_rebuild()
-Intersection.model_rebuild()
-Relationship.model_rebuild()
-SpatialRelationship.model_rebuild()
+StaticObject.model_rebuild()
+Relation.model_rebuild()
+SpatialRelation.model_rebuild()
 InFrontOf.model_rebuild()
 Behind.model_rebuild()
 LeftOf.model_rebuild()
 RightOf.model_rebuild()
-RoadRegionRelationship.model_rebuild()
+RoadObjectRelation.model_rebuild()
 InLane.model_rebuild()
-InIntersection.model_rebuild()
+LaneRelation.model_rebuild()
+LeftAdjacentTo.model_rebuild()
+Overlaps.model_rebuild()
 Scene.model_rebuild()

@@ -2,65 +2,53 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from src.graph._generated.models import (
-    ObjectState,
-    PerceivedRoadEntity,
-    PerceivedRoadUser,
-    Relationship,
-    RoadEntity,
-    RoadRegion,
-)
+from src.graph._generated.models import Relation, RoadObject, SceneObject
 
 
-type PerceivedEntityModel = type[PerceivedRoadEntity]
-type RoadUserModel = type[PerceivedRoadUser]
-type RoadRegionModel = type[RoadRegion]
-type RelationshipModel = type[Relationship]
-type ObjectStateModel = type[ObjectState]
-type EntityModel = type[RoadEntity] | type[RoadRegion]
+type ObjectModel = type[SceneObject]
+type RoadObjectModel = type[RoadObject]
+type RelationModel = type[Relation]
 
 
 @dataclass(frozen=True, slots=True)
 class DetectionTarget:
-    model: PerceivedEntityModel
+    model: ObjectModel
     prompt: str
 
 
 @dataclass(frozen=True, slots=True)
-class RoadRegionTarget:
-    model: RoadRegionModel
-    description: str
-    membership_model: RelationshipModel
-    id_prefix: str
-
-
-@dataclass(frozen=True, slots=True)
-class RelationshipTarget:
-    model: RelationshipModel
-    description: str
-    subject_model: EntityModel
-    object_model: EntityModel
-    exclusive_group: str | None
-    extraction_enabled: bool
-
-
-@dataclass(frozen=True, slots=True)
-class StateValue:
+class AttributeValue:
     value: str
     description: str
     prompt: str
 
 
 @dataclass(frozen=True, slots=True)
-class StateAttribute:
+class ObjectAttributeTarget:
+    object_model: ObjectModel
     name: str
     description: str
-    values: tuple[StateValue, ...]
+    required: bool
+    values: tuple[AttributeValue, ...]
 
 
 @dataclass(frozen=True, slots=True)
-class StateTarget:
-    model: ObjectStateModel
+class RoadLayoutTarget:
+    model: RoadObjectModel
     description: str
-    subject_model: RoadUserModel
-    attributes: tuple[StateAttribute, ...]
+    membership_model: RelationModel
+    id_prefix: str
+    attributes: tuple[ObjectAttributeTarget, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class RelationTarget:
+    model: RelationModel
+    description: str
+    subject_model: ObjectModel
+    object_model: ObjectModel
+    exclusive_group: str | None
+    relation_extraction: bool
+    road_layout_extraction: bool
+    topology_constraint: str | None
+    symmetric: bool

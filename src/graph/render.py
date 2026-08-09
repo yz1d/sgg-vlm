@@ -5,7 +5,7 @@ import json
 import shutil
 import subprocess
 
-from src.graph._generated.models import Scene
+from src.graph._generated.models import RoadObject, Scene, StaticObject
 
 
 class GraphvizError(RuntimeError):
@@ -46,77 +46,80 @@ def graph_to_dot(graph: Scene) -> str:
         'fontname="Helvetica", fontsize=12, margin="0.14,0.08"];',
         '  edge [color="black", fontcolor="black", penwidth=1.1, '
         'fontname="Helvetica", fontsize=11, arrowsize=0.8];',
-        '  "ego" [label="ego\\nEgoVehicle", fillcolor="#ff6b6b"];',
-        '  { rank=min; "ego"; }',
     ]
 
-    states_by_subject: dict[str, list[str]] = {}
-    for state in graph.states or []:
-        values = state.model_dump(
+    ego = next(object_ for object_ in graph.objects if object_.id == "ego")
+    ego_label = f"ego\n{ego.type}"
+    lines.extend(
+        [
+            f'  "ego" [label={quoted(ego_label)}, fillcolor="#ff6b6b"];',
+            '  { rank=min; "ego"; }',
+        ]
+    )
+
+    non_ego_objects = sorted(
+        (object_ for object_ in graph.objects if object_.id != "ego"),
+        key=lambda object_: object_.id,
+    )
+    for object_ in non_ego_objects:
+        label = f"{object_.id}\n{object_.type}"
+        attributes = object_.model_dump(
             mode="json",
-            exclude={"type", "subject", "provenance"},
+            exclude={"id", "type", "bbox", "track_id", "provenance"},
             exclude_none=True,
         )
-        detail = ", ".join(f"{name}={value}" for name, value in values.items())
-        label = state.type + (f": {detail}" if detail else "")
-        states_by_subject.setdefault(state.subject, []).append(label)
-
-    perceived_entities = sorted(
-        graph.perceived_entities or [], key=lambda entity: entity.id
-    )
-    for entity in perceived_entities:
-        label = f"{entity.id}\n{entity.type}"
-        for state in states_by_subject.get(entity.id, []):
-            label += f"\n[{state}]"
+        for name, value in attributes.items():
+            label += f"\n{name}={value}"
+        shape = "box" if isinstance(object_, RoadObject) else "ellipse"
+        if isinstance(object_, StaticObject):
+            shape = "diamond"
         lines.append(
-            f"  {quoted(entity.id)} "
-            f"[label={quoted(label)}, fillcolor={quoted(color_for(entity.type))}];"
-        )
-
-    road_regions = sorted(
-        graph.road_regions or [], key=lambda road_region: road_region.id
-    )
-    for road_region in road_regions:
-        label = f"{road_region.id}\n{road_region.type}"
-        lines.append(
-            f"  {quoted(road_region.id)} "
-            f"[label={quoted(label)}, shape=box, "
-            f"fillcolor={quoted(color_for(road_region.type))}];"
+            f"  {quoted(object_.id)} "
+            f"[label={quoted(label)}, shape={shape}, "
+            f"fillcolor={quoted(color_for(object_.type))}];"
         )
 
     relations_by_pair: dict[tuple[str, str], list[str]] = {}
-    for relationship in graph.relationships or []:
-        relations_by_pair.setdefault(
-            (relationship.subject, relationship.object), []
-        ).append(relationship.type)
+    for relation in graph.relations:
+        relations_by_pair.setdefault((relation.subject, relation.object), []).append(
+            relation.type
+        )
 
-    perceived_entity_ids = [entity.id for entity in perceived_entities]
-    if perceived_entity_ids:
+    visible_object_ids = [
+        object_.id
+        for object_ in non_ego_objects
+        if object_.bbox is not None
+    ]
+    if visible_object_ids:
         lines.append(
             f"  {{ rank=same; "
-            f"{'; '.join(quoted(item) for item in perceived_entity_ids)}; }}"
+            f"{'; '.join(quoted(item) for item in visible_object_ids)}; }}"
         )
         connected_to_ego = {
             object_ if subject == "ego" else subject
             for subject, object_ in relations_by_pair
             if subject == "ego" or object_ == "ego"
         }
-        for entity_id in perceived_entity_ids:
-            if entity_id not in connected_to_ego:
+        for object_id in visible_object_ids:
+            if object_id not in connected_to_ego:
                 lines.append(
-                    f'  "ego" -> {quoted(entity_id)} '
+                    f'  "ego" -> {quoted(object_id)} '
                     "[style=invis, weight=100];"
                 )
 
-    road_region_ids = [road_region.id for road_region in road_regions]
-    if road_region_ids:
+    road_object_ids = [
+        object_.id
+        for object_ in non_ego_objects
+        if isinstance(object_, RoadObject) and object_.bbox is None
+    ]
+    if road_object_ids:
         lines.append(
             f"  {{ rank=max; "
-            f"{'; '.join(quoted(item) for item in road_region_ids)}; }}"
+            f"{'; '.join(quoted(item) for item in road_object_ids)}; }}"
         )
 
-    for (subject, object_), relationship_types in sorted(relations_by_pair.items()):
-        label = "\n".join(dict.fromkeys(relationship_types))
+    for (subject, object_), relation_types in sorted(relations_by_pair.items()):
+        label = "\n".join(dict.fromkeys(relation_types))
         if object_ == "ego":
             lines.append(
                 f'  "ego" -> {quoted(subject)} '

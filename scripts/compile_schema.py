@@ -38,8 +38,11 @@ def main() -> int:
 
 
 def _catalog_source(view: SchemaView) -> str:
+    concrete_objects = _concrete_descendants(view, "SceneObject")
+    concrete_relations = _concrete_descendants(view, "Relation")
+
     detection_targets = []
-    for name in _concrete_descendants(view, "PerceivedRoadEntity"):
+    for name in concrete_objects:
         prompt = _annotation(view.get_class(name), "object_detection_prompt")
         if prompt is not None:
             detection_targets.append((name, prompt))
@@ -52,111 +55,75 @@ def _catalog_source(view: SchemaView) -> str:
             )
         prompts[prompt.casefold()] = name
 
-    relationship_targets = []
-    relationship_by_object_range: dict[str, list[str]] = {}
-    for name in _concrete_descendants(view, "Relationship"):
+    relation_targets = []
+    membership_by_object_range: dict[str, list[str]] = {}
+    road_object_relations = set(
+        _concrete_descendants(view, "RoadObjectRelation")
+    )
+    for name in concrete_relations:
         definition = _required_class(view, name)
         subject_range = str(view.induced_slot("subject", name).range)
         object_range = str(view.induced_slot("object", name).range)
-        exclusive_group = _annotation(definition, "exclusive_group")
-        extraction_enabled = (
-            _annotation(definition, "relation_extraction") == "enabled"
-        )
-        relationship_targets.append(
+        relation_targets.append(
             (
                 name,
                 _description(definition, name),
                 subject_range,
                 object_range,
-                exclusive_group,
-                extraction_enabled,
+                _annotation(definition, "exclusive_group"),
+                _annotation(definition, "relation_extraction") == "enabled",
+                _annotation(definition, "road_layout_extraction") == "enabled",
+                _annotation(definition, "topology_constraint"),
+                _annotation(definition, "symmetric") == "enabled",
             )
         )
-        if name in _concrete_descendants(view, "RoadRegionRelationship"):
-            relationship_by_object_range.setdefault(object_range, []).append(name)
+        if name in road_object_relations:
+            membership_by_object_range.setdefault(object_range, []).append(name)
 
-    road_region_targets = []
-    for name in _concrete_descendants(view, "RoadRegion"):
-        memberships = relationship_by_object_range.get(name, [])
+    road_layout_attributes = _attribute_targets(
+        view,
+        concrete_objects,
+        extraction_annotation="road_layout_extraction",
+    )
+    relation_attributes = _attribute_targets(
+        view,
+        concrete_objects,
+        extraction_annotation="relation_extraction",
+    )
+
+    road_layout_targets = []
+    for name in _concrete_descendants(view, "RoadObject"):
+        definition = _required_class(view, name)
+        if _annotation(definition, "road_layout_extraction") != "enabled":
+            continue
+        memberships = membership_by_object_range.get(name, [])
         if len(memberships) != 1:
             raise ValueError(
-                f"Road region {name} needs exactly one concrete membership "
-                f"relationship, found {memberships}"
+                f"Road layout object {name} needs exactly one membership relation, "
+                f"found {memberships}"
             )
-        road_region_targets.append(
-            (
-                name,
-                _description(_required_class(view, name), name),
-                memberships[0],
-                _snake_case(name),
-            )
-        )
-
-    state_targets = []
-    system_fields = {"type", "subject", "provenance"}
-    for name in _concrete_descendants(view, "ObjectState"):
-        definition = _required_class(view, name)
-        subject_range = str(view.induced_slot("subject", name).range)
-        attributes = []
-        for slot in view.class_induced_slots(name):
-            slot_name = str(slot.name)
-            if slot_name in system_fields:
-                continue
-            if slot.multivalued:
-                raise ValueError(f"Object state field {name}.{slot_name} cannot be multivalued")
-            enum_definition = view.get_enum(slot.range)
-            if enum_definition is None:
-                raise ValueError(
-                    f"Object state field {name}.{slot_name} must use an enum"
-                )
-            values = []
-            for value, permissible in enum_definition.permissible_values.items():
-                prompt = _annotation(permissible, "relation_extraction_prompt")
-                if prompt is None:
-                    raise ValueError(
-                        f"State value {enum_definition.name}.{value} needs a "
-                        "relation_extraction_prompt annotation"
-                    )
-                values.append(
-                    (
-                        str(value),
-                        permissible.description or str(value),
-                        prompt,
-                    )
-                )
-            attributes.append(
-                (
-                    slot_name,
-                    slot.description or enum_definition.description or slot_name,
-                    values,
-                )
-            )
-        if not attributes:
-            raise ValueError(f"Object state {name} has no value fields")
-        state_targets.append(
+        road_layout_targets.append(
             (
                 name,
                 _description(definition, name),
-                subject_range,
-                attributes,
+                memberships[0],
+                _snake_case(name),
+                tuple(
+                    target
+                    for target in road_layout_attributes
+                    if target[0] == name
+                ),
             )
         )
 
-    concrete_perceived_entities = _concrete_descendants(
-        view, "PerceivedRoadEntity"
-    )
-    concrete_road_regions = _concrete_descendants(view, "RoadRegion")
-    concrete_relationships = _concrete_descendants(view, "Relationship")
-    concrete_states = _concrete_descendants(view, "ObjectState")
     model_names = {
+        *concrete_objects,
+        *concrete_relations,
         *(name for name, _ in detection_targets),
-        *(item for target in road_region_targets for item in (target[0], target[2])),
-        *(item for target in relationship_targets for item in (target[0], target[2], target[3])),
-        *(item for target in state_targets for item in (target[0], target[2])),
-        *concrete_perceived_entities,
-        *concrete_road_regions,
-        *concrete_relationships,
-        *concrete_states,
+        *(item for target in relation_targets for item in target[:1] + target[2:4]),
+        *(item for target in road_layout_targets for item in target[:1] + target[2:3]),
+        *(target[0] for target in road_layout_attributes),
+        *(target[0] for target in relation_attributes),
     }
 
     lines = [
@@ -166,12 +133,11 @@ def _catalog_source(view: SchemaView) -> str:
         *(f"    {name}," for name in sorted(model_names)),
         ")",
         "from src.graph.ontology import (",
+        "    AttributeValue,",
         "    DetectionTarget,",
-        "    RelationshipTarget,",
-        "    RoadRegionTarget,",
-        "    StateAttribute,",
-        "    StateTarget,",
-        "    StateValue,",
+        "    ObjectAttributeTarget,",
+        "    RelationTarget,",
+        "    RoadLayoutTarget,",
         ")",
         "",
         "",
@@ -186,83 +152,145 @@ def _catalog_source(view: SchemaView) -> str:
                 "    ),",
             ]
         )
-    lines.extend([")", "", "", "ROAD_REGION_TARGETS = ("])
-    for name, description, membership, prefix in sorted(road_region_targets):
+    lines.extend([")", "", "", "ROAD_LAYOUT_TARGETS = ("])
+    for name, description, membership, prefix, attributes in sorted(
+        road_layout_targets
+    ):
         lines.extend(
             [
-                "    RoadRegionTarget(",
+                "    RoadLayoutTarget(",
                 f"        model={name},",
                 f"        description={description!r},",
                 f"        membership_model={membership},",
                 f"        id_prefix={prefix!r},",
-                "    ),",
+                "        attributes=(",
             ]
         )
-    lines.extend([")", "", "", "RELATIONSHIP_TARGETS = ("])
+        _append_attribute_targets(lines, attributes, indent="            ")
+        lines.extend(["        ),", "    ),"])
+    lines.extend([")", "", "", "RELATION_TARGETS = ("])
     for (
         name,
         description,
         subject_range,
         object_range,
         exclusive_group,
-        extraction_enabled,
-    ) in sorted(relationship_targets):
+        relation_extraction,
+        road_layout_extraction,
+        topology_constraint,
+        symmetric,
+    ) in sorted(relation_targets):
         lines.extend(
             [
-                "    RelationshipTarget(",
+                "    RelationTarget(",
                 f"        model={name},",
                 f"        description={description!r},",
                 f"        subject_model={subject_range},",
                 f"        object_model={object_range},",
                 f"        exclusive_group={exclusive_group!r},",
-                f"        extraction_enabled={extraction_enabled!r},",
+                f"        relation_extraction={relation_extraction!r},",
+                f"        road_layout_extraction={road_layout_extraction!r},",
+                f"        topology_constraint={topology_constraint!r},",
+                f"        symmetric={symmetric!r},",
                 "    ),",
             ]
         )
-    lines.extend([")", "", "", "STATE_TARGETS = ("])
-    for name, description, subject_range, attributes in sorted(state_targets):
-        lines.extend(
-            [
-                "    StateTarget(",
-                f"        model={name},",
-                f"        description={description!r},",
-                f"        subject_model={subject_range},",
-                "        attributes=(",
-            ]
-        )
-        for attribute_name, attribute_description, values in attributes:
-            lines.extend(
-                [
-                    "            StateAttribute(",
-                    f"                name={attribute_name!r},",
-                    f"                description={attribute_description!r},",
-                    "                values=(",
-                ]
-            )
-            for value, value_description, prompt in values:
-                lines.extend(
-                    [
-                        "                    StateValue(",
-                        f"                        value={value!r},",
-                        f"                        description={value_description!r},",
-                        f"                        prompt={prompt!r},",
-                        "                    ),",
-                    ]
-                )
-            lines.extend(["                ),", "            ),"])
-        lines.extend(["        ),", "    ),"])
+    lines.extend([")", "", "", "OBJECT_ATTRIBUTE_TARGETS = ("])
+    _append_attribute_targets(lines, relation_attributes, indent="    ")
     lines.extend([")", ""])
     return "\n".join(lines)
 
 
+def _attribute_targets(
+    view: SchemaView,
+    concrete_objects: tuple[str, ...],
+    *,
+    extraction_annotation: str,
+) -> list[tuple[str, str, str, bool, list[tuple[str, str, str]]]]:
+    targets = []
+    prompt_annotation = extraction_annotation + "_prompt"
+    system_fields = {"id", "type", "bbox", "track_id", "provenance"}
+    for name in concrete_objects:
+        declared_slots: dict[str, Any] = {}
+        for ancestor in view.class_ancestors(name, reflexive=True):
+            definition = _required_class(view, str(ancestor))
+            for slot in definition.attributes.values():
+                declared_slots.setdefault(str(slot.name), slot)
+        for slot_name, slot in declared_slots.items():
+            if slot_name in system_fields:
+                continue
+            if _annotation(slot, extraction_annotation) != "enabled":
+                continue
+            if slot.multivalued:
+                raise ValueError(
+                    f"Extracted object attribute {name}.{slot_name} cannot be multivalued"
+                )
+            enum_definition = view.get_enum(slot.range)
+            if enum_definition is None:
+                raise ValueError(
+                    f"Extracted object attribute {name}.{slot_name} must use an enum"
+                )
+            values = []
+            for value, permissible in enum_definition.permissible_values.items():
+                prompt = _annotation(permissible, prompt_annotation)
+                if prompt is None:
+                    raise ValueError(
+                        f"Attribute value {enum_definition.name}.{value} needs a "
+                        f"{prompt_annotation} annotation"
+                    )
+                values.append(
+                    (
+                        str(value),
+                        permissible.description or str(value),
+                        prompt,
+                    )
+                )
+            targets.append(
+                (
+                    name,
+                    slot_name,
+                    slot.description or enum_definition.description or slot_name,
+                    slot.required is True,
+                    values,
+                )
+            )
+    return targets
+
+
+def _append_attribute_targets(
+    lines: list[str],
+    targets: Any,
+    *,
+    indent: str,
+) -> None:
+    for model_name, name, description, required, values in targets:
+        lines.extend(
+            [
+                f"{indent}ObjectAttributeTarget(",
+                f"{indent}    object_model={model_name},",
+                f"{indent}    name={name!r},",
+                f"{indent}    description={description!r},",
+                f"{indent}    required={required!r},",
+                f"{indent}    values=(",
+            ]
+        )
+        for value, value_description, prompt in values:
+            lines.extend(
+                [
+                    f"{indent}        AttributeValue(",
+                    f"{indent}            value={value!r},",
+                    f"{indent}            description={value_description!r},",
+                    f"{indent}            prompt={prompt!r},",
+                    f"{indent}        ),",
+                ]
+            )
+        lines.extend([f"{indent}    ),", f"{indent}),"])
+
+
 def _restrict_scene_collections(models: str, view: SchemaView) -> str:
     collection_models = {
-        "perceived_entities": _concrete_descendants(
-            view, "PerceivedRoadEntity"
-        ),
-        "road_regions": _concrete_descendants(view, "RoadRegion"),
-        "states": _concrete_descendants(view, "ObjectState"),
-        "relationships": _concrete_descendants(view, "Relationship"),
+        "objects": _concrete_descendants(view, "SceneObject"),
+        "relations": _concrete_descendants(view, "Relation"),
     }
     uses_annotated = False
     for field_name, model_names in collection_models.items():
@@ -277,11 +305,11 @@ def _restrict_scene_collections(models: str, view: SchemaView) -> str:
             )
             uses_annotated = True
         pattern = re.compile(
-            rf"^(    {field_name}: Optional\[list\[)Union\[[^\n]+\](\]\] = Field\()",
+            rf"^(    {field_name}: )list\[Union\[[^\n]+\]\]( = Field\()",
             re.MULTILINE,
         )
         models, replacements = pattern.subn(
-            rf"\g<1>{value_annotation}\g<2>", models
+            rf"\g<1>list[{value_annotation}]\g<2>", models
         )
         if replacements != 1:
             raise ValueError(
@@ -320,9 +348,10 @@ def _required_class(view: SchemaView, name: str) -> Any:
 
 
 def _annotation(element: Any, name: str) -> str | None:
-    annotation = element.annotations.get(name)
-    if annotation is None:
+    annotations = element.annotations
+    if name not in annotations:
         return None
+    annotation = annotations[name]
     value = annotation.value
     if not isinstance(value, str) or not value.strip():
         raise ValueError(f"LinkML annotation {name} must be a nonempty string")
