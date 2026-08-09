@@ -2,8 +2,8 @@ id: https://w3id.org/sgg-vlm/schema
 name: sgg_vlm
 version: 0.1.0
 description: >-
-  The normalized scene graph produced by sgg-vlm. The schema contains perceived
-  road entities, road regions, object states, and supported relationships.
+  The normalized scene graph produced by sgg-vlm. The schema contains scene
+  objects, relations, visible weather, and frame provenance.
 
 prefixes:
   linkml: https://w3id.org/linkml/
@@ -16,10 +16,8 @@ imports:
   - linkml:types
   - common
   - weather
-  - states
-  - road_entities
-  - road_regions
-  - relationships
+  - objects
+  - relations
 
 classes:
   Scene:
@@ -41,31 +39,18 @@ classes:
         multivalued: true
         inlined_as_list: true
         required: true
-      ego:
-        description: The observing vehicle, which is not represented by an image bounding box.
-        range: EgoVehicle
-        inlined: true
-        required: true
       weather:
         description: Visible atmospheric condition for this scene.
         range: WeatherCondition
-      perceived_entities:
-        description: Non-ego road entities perceived in the frame.
-        range: PerceivedRoadEntity
+      objects:
+        description: Potentially moving, road, and static objects represented in the scene.
+        range: SceneObject
         multivalued: true
         inlined_as_list: true
-      road_regions:
-        description: Road regions perceived in the frame.
-        range: RoadRegion
+        required: true
+      relations:
+        description: Relations between objects represented in the scene.
+        range: Relation
         multivalued: true
         inlined_as_list: true
-      states:
-        description: States observed on perceived road users in this frame.
-        range: ObjectState
-        multivalued: true
-        inlined_as_list: true
-      relationships:
-        description: Relationships between entities represented in the scene.
-        range: Relationship
-        multivalued: true
-        inlined_as_list: true
+        required: true

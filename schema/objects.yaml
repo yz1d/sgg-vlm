@@ -1,0 +1,199 @@
+id: https://w3id.org/sgg-vlm/schema/objects
+name: sgg_vlm_objects
+version: 0.1.0
+description: Scene object types supported by the sgg-vlm scene graph.
+
+prefixes:
+  linkml: https://w3id.org/linkml/
+  sggvlm: https://w3id.org/sgg-vlm/
+
+default_prefix: sggvlm
+default_range: string
+
+imports:
+  - common
+
+classes:
+  ObjectProvenance:
+    description: Provenance that identifies the parts of an object record supported by a source.
+    is_a: Provenance
+    attributes:
+      supports:
+        description: Decisions in the object record supported by this source.
+        range: ObjectDecision
+        multivalued: true
+        required: true
+
+  SceneObject:
+    description: An object represented in the scene graph.
+    abstract: true
+    attributes:
+      id:
+        description: Identity used to reference this object within the scene.
+        identifier: true
+        range: string
+        required: true
+      type:
+        description: Concrete LinkML class of this object.
+        designates_type: true
+        range: string
+        required: true
+      bbox:
+        description: Optional image-space bounding box in pixel XYXY coordinates.
+        range: BoundingBox2D
+        inlined: true
+      track_id:
+        description: Optional cross-frame identity for the same physical object.
+        range: string
+      provenance:
+        description: Sources that support decisions in this object record.
+        range: ObjectProvenance
+        multivalued: true
+        inlined_as_list: true
+        required: true
+
+  PotentiallyMovingObject:
+    description: An object that can move or has moved and is relevant to the driving scene.
+    is_a: SceneObject
+    abstract: true
+
+  EgoVehicle:
+    description: The observing vehicle and reference object for spatial relations.
+    is_a: PotentiallyMovingObject
+    slot_usage:
+      id:
+        equals_string: ego
+
+  RoadUser:
+    description: A visible traffic participant localized in the input image.
+    is_a: PotentiallyMovingObject
+    abstract: true
+    slot_usage:
+      bbox:
+        required: true
+
+  Vehicle:
+    description: An abstract motor vehicle.
+    is_a: RoadUser
+    abstract: true
+
+  Car:
+    description: A passenger car.
+    is_a: Vehicle
+    annotations:
+      object_detection_prompt: car
+
+  Truck:
+    description: A truck.
+    is_a: Vehicle
+    annotations:
+      object_detection_prompt: truck
+
+  Bus:
+    description: A passenger bus that is not necessarily a school bus.
+    is_a: Vehicle
+    annotations:
+      object_detection_prompt: bus
+
+  SchoolBus:
+    description: A bus used to transport students.
+    is_a: Bus
+    annotations:
+      object_detection_prompt: school bus
+    attributes:
+      stop_arm_position:
+        description: Visible position of the school bus stop arm.
+        range: StopArmPosition
+        annotations:
+          relation_extraction: enabled
+
+  Motorcycle:
+    description: A motorcycle.
+    is_a: Vehicle
+    annotations:
+      object_detection_prompt: motorcycle
+
+  Cyclist:
+    description: A person riding a bicycle.
+    is_a: RoadUser
+    annotations:
+      object_detection_prompt: cyclist
+
+  Pedestrian:
+    description: A person traveling on foot.
+    is_a: RoadUser
+    annotations:
+      object_detection_prompt: pedestrian
+
+  RoadObject:
+    description: A road surface, road limitation, or road structure represented in the scene.
+    is_a: SceneObject
+    abstract: true
+
+  RoadBlockage:
+    description: A contiguous visible road area unavailable for normal vehicle travel.
+    is_a: RoadObject
+    slot_usage:
+      bbox:
+        required: true
+    annotations:
+      object_detection_prompt: blocked road area
+
+  Lane:
+    description: A semantic traffic lane relevant to ego's immediate driving situation.
+    is_a: RoadObject
+    annotations:
+      road_layout_extraction: enabled
+    attributes:
+      direction:
+        description: Traffic direction in this lane relative to ego's direction.
+        range: LaneDirection
+        required: true
+
+  StaticObject:
+    description: A fixed landmark, traffic sign, sign board, or traffic light.
+    is_a: SceneObject
+    abstract: true
+
+enums:
+  ObjectDecision:
+    description: A decision bundled into an object record.
+    permissible_values:
+      existence:
+        description: The object exists in the scene.
+      classification:
+        description: The object has the selected concrete type.
+      bounding_box:
+        description: The object occupies the selected image bounding box.
+      tracking:
+        description: The object has the selected cross-frame track identity.
+      attributes:
+        description: The object has the selected object-specific attribute values.
+
+  LaneDirection:
+    description: Traffic direction in a lane relative to ego's direction.
+    permissible_values:
+      same_as_ego:
+        description: Traffic travels approximately in ego's direction.
+        annotations:
+          road_layout_extraction_prompt: Traffic in this lane travels in approximately the same direction as ego.
+      opposite_to_ego:
+        description: Traffic travels approximately opposite ego's direction.
+        annotations:
+          road_layout_extraction_prompt: Traffic in this lane travels in approximately the opposite direction from ego.
+      crossing:
+        description: Traffic crosses ego's general direction.
+        annotations:
+          road_layout_extraction_prompt: Traffic in this lane crosses ego's general direction.
+
+  StopArmPosition:
+    description: Supported positions of a school bus stop arm.
+    permissible_values:
+      deployed:
+        description: The stop arm projects outward from the bus.
+        annotations:
+          relation_extraction_prompt: The stop arm is visibly extended outward from the side of the bus.
+      stowed:
+        description: The stop arm is folded against the bus.
+        annotations:
+          relation_extraction_prompt: The stop arm is visibly folded flat against the side of the bus.
