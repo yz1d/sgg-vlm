@@ -299,6 +299,28 @@ class Pedestrian(PotentiallyMovingObject):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
+class ConstructionWorker(PotentiallyMovingObject):
+    """
+    A person visibly performing construction or maintenance work in the traffic scene.
+    """
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["ConstructionWorker"] = Field(default="ConstructionWorker", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
+
+
+class PoliceOfficer(PotentiallyMovingObject):
+    """
+    A visibly identifiable police officer in the traffic scene.
+    """
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["PoliceOfficer"] = Field(default="PoliceOfficer", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
+
+
 class RoadObject(SceneObject):
     """
     A road surface, road limitation, or road structure represented in the scene.
@@ -471,7 +493,7 @@ class Scene(ConfiguredBaseModel):
     timestamp_ns: Optional[int] = Field(default=None, description="""Optional source timestamp in nanoseconds.""", ge=0)
     provenance: list[Provenance] = Field(default=..., description="""Sources that contributed the frame represented by this scene.""")
     weather: Optional[WeatherCondition] = Field(default=None, description="""Visible atmospheric condition for this scene.""")
-    objects: list[Annotated[Union[Bus,Car,Cyclist,EgoVehicle,Lane,Motorcycle,Pedestrian,RoadBlockage,SchoolBus,Truck], Field(discriminator="type")]] = Field(default=..., description="""Potentially moving, road, and static objects represented in the scene.""")
+    objects: list[Annotated[Union[Bus,Car,ConstructionWorker,Cyclist,EgoVehicle,Lane,Motorcycle,Pedestrian,PoliceOfficer,RoadBlockage,SchoolBus,Truck], Field(discriminator="type")]] = Field(default=..., description="""Potentially moving, road, and static objects represented in the scene.""")
     relations: list[Annotated[Union[Behind,InFrontOf,InLane,LeftAdjacentTo,LeftOf,Overlaps,RightOf], Field(discriminator="type")]] = Field(default=..., description="""Relations between objects represented in the scene.""")
 
 
@@ -490,6 +512,8 @@ SchoolBus.model_rebuild()
 Motorcycle.model_rebuild()
 Cyclist.model_rebuild()
 Pedestrian.model_rebuild()
+ConstructionWorker.model_rebuild()
+PoliceOfficer.model_rebuild()
 RoadObject.model_rebuild()
 RoadBlockage.model_rebuild()
 Lane.model_rebuild()
