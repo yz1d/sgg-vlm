@@ -266,17 +266,10 @@ class ObjectDetectionStage:
 
 def _build_prompt(vocabulary: list[JsonValue]) -> str:
     vocabulary_json = json.dumps(vocabulary, separators=(",", ":"))
-    return f"""Inspect this front-camera road image and locate every requested scene object.
+    return f"""Detect every visible object represented in the vocabulary, even if it is small or partially occluded.
+Use the most specific type and a tight [x_min,y_min,x_max,y_max] box around each visible extent in normalized 0-1000 coordinates.
 
-Use only object types from this schema vocabulary: {vocabulary_json}
-Include small or partly occluded objects when they are visible.
-Classify each physical object once. Use the most specific applicable schema type.
-Use a tight box around the visible extent of the represented object or area.
-Do not infer objects outside the image.
-Include required attributes. Omit optional attributes when the visual state is unclear.
-Return JSON as detections with one type, bbox, and attributes object per object.
-Coordinates use [x_min,y_min,x_max,y_max], normalized from 0 through 1000.
-The top-left image corner is [0,0]. The bottom-right corner is [1000,1000].
+Vocabulary: {vocabulary_json}
 """
 
 

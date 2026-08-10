@@ -65,13 +65,8 @@ class WeatherExtractionStage:
 
 
 def _build_prompt(vocabulary: list[str]) -> str:
-    return f"""Classify the visible weather for this road scene.
+    return f"""Classify the visible atmospheric condition with one adjective from the vocabulary.
+Return null when the image does not show clear evidence.
 
-Select one adjective from this vocabulary:
-{json.dumps(vocabulary, separators=(",", ":"))}
-
-Report the current atmospheric condition only.
-Do not use the time of day or general brightness as weather.
-Do not infer rain only from a wet road.
-Return null when the image has no clear evidence.
+Vocabulary: {json.dumps(vocabulary, separators=(",", ":"))}
 """
