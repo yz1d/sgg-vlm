@@ -201,16 +201,16 @@ class SceneObject(ConfiguredBaseModel):
 
 class PotentiallyMovingObject(SceneObject):
     """
-    An object that can move or has moved and is relevant to the driving scene.
+    A visible object that takes an active or passive part in traffic.
     """
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["PotentiallyMovingObject"] = Field(default="PotentiallyMovingObject", description="""Concrete LinkML class of this object.""")
-    bbox: Optional[BoundingBox2D] = Field(default=None, description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
     track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class EgoVehicle(PotentiallyMovingObject):
+class EgoVehicle(SceneObject):
     """
     The observing vehicle and reference object for spatial relations.
     """
@@ -221,31 +221,9 @@ class EgoVehicle(PotentiallyMovingObject):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class RoadUser(PotentiallyMovingObject):
+class Car(PotentiallyMovingObject):
     """
-    A visible traffic participant localized in the input image.
-    """
-    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
-    type: Literal["RoadUser"] = Field(default="RoadUser", description="""Concrete LinkML class of this object.""")
-    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
-    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
-
-
-class Vehicle(RoadUser):
-    """
-    An abstract motor vehicle.
-    """
-    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
-    type: Literal["Vehicle"] = Field(default="Vehicle", description="""Concrete LinkML class of this object.""")
-    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
-    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
-
-
-class Car(Vehicle):
-    """
-    A passenger car.
+    A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.
     """
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Car"] = Field(default="Car", description="""Concrete LinkML class of this object.""")
@@ -254,9 +232,9 @@ class Car(Vehicle):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Truck(Vehicle):
+class Truck(PotentiallyMovingObject):
     """
-    A truck.
+    A motorized vehicle designed primarily to transport cargo.
     """
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Truck"] = Field(default="Truck", description="""Concrete LinkML class of this object.""")
@@ -265,9 +243,9 @@ class Truck(Vehicle):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Bus(Vehicle):
+class Bus(PotentiallyMovingObject):
     """
-    A passenger bus that is not necessarily a school bus.
+    A motorized vehicle designed to carry multiple passengers.
     """
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Bus"] = Field(default="Bus", description="""Concrete LinkML class of this object.""")
@@ -288,9 +266,9 @@ class SchoolBus(Bus):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Motorcycle(Vehicle):
+class Motorcycle(PotentiallyMovingObject):
     """
-    A motorcycle.
+    A motorized vehicle designed primarily for passenger transportation on two or three wheels.
     """
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Motorcycle"] = Field(default="Motorcycle", description="""Concrete LinkML class of this object.""")
@@ -299,7 +277,7 @@ class Motorcycle(Vehicle):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Cyclist(RoadUser):
+class Cyclist(PotentiallyMovingObject):
     """
     A person riding a bicycle.
     """
@@ -310,9 +288,9 @@ class Cyclist(RoadUser):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Pedestrian(RoadUser):
+class Pedestrian(PotentiallyMovingObject):
     """
-    A person traveling on foot.
+    A person on foot in the traffic scene.
     """
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Pedestrian"] = Field(default="Pedestrian", description="""Concrete LinkML class of this object.""")
@@ -505,8 +483,6 @@ ObjectProvenance.model_rebuild()
 SceneObject.model_rebuild()
 PotentiallyMovingObject.model_rebuild()
 EgoVehicle.model_rebuild()
-RoadUser.model_rebuild()
-Vehicle.model_rebuild()
 Car.model_rebuild()
 Truck.model_rebuild()
 Bus.model_rebuild()

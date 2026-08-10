@@ -53,45 +53,35 @@ classes:
         required: true
 
   PotentiallyMovingObject:
-    description: An object that can move or has moved and is relevant to the driving scene.
+    description: A visible object that takes an active or passive part in traffic.
     is_a: SceneObject
-    abstract: true
-
-  EgoVehicle:
-    description: The observing vehicle and reference object for spatial relations.
-    is_a: PotentiallyMovingObject
-    slot_usage:
-      id:
-        equals_string: ego
-
-  RoadUser:
-    description: A visible traffic participant localized in the input image.
-    is_a: PotentiallyMovingObject
     abstract: true
     slot_usage:
       bbox:
         required: true
 
-  Vehicle:
-    description: An abstract motor vehicle.
-    is_a: RoadUser
-    abstract: true
+  EgoVehicle:
+    description: The observing vehicle and reference object for spatial relations.
+    is_a: SceneObject
+    slot_usage:
+      id:
+        equals_string: ego
 
   Car:
-    description: A passenger car.
-    is_a: Vehicle
+    description: A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.
+    is_a: PotentiallyMovingObject
     annotations:
       object_detection_prompt: car
 
   Truck:
-    description: A truck.
-    is_a: Vehicle
+    description: A motorized vehicle designed primarily to transport cargo.
+    is_a: PotentiallyMovingObject
     annotations:
       object_detection_prompt: truck
 
   Bus:
-    description: A passenger bus that is not necessarily a school bus.
-    is_a: Vehicle
+    description: A motorized vehicle designed to carry multiple passengers.
+    is_a: PotentiallyMovingObject
     annotations:
       object_detection_prompt: bus
 
@@ -108,20 +98,20 @@ classes:
           relation_extraction: enabled
 
   Motorcycle:
-    description: A motorcycle.
-    is_a: Vehicle
+    description: A motorized vehicle designed primarily for passenger transportation on two or three wheels.
+    is_a: PotentiallyMovingObject
     annotations:
       object_detection_prompt: motorcycle
 
   Cyclist:
     description: A person riding a bicycle.
-    is_a: RoadUser
+    is_a: PotentiallyMovingObject
     annotations:
       object_detection_prompt: cyclist
 
   Pedestrian:
-    description: A person traveling on foot.
-    is_a: RoadUser
+    description: A person on foot in the traffic scene.
+    is_a: PotentiallyMovingObject
     annotations:
       object_detection_prompt: pedestrian
 
