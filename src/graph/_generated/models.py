@@ -148,11 +148,11 @@ class StopArmPosition(str, Enum):
     """
     deployed = "deployed"
     """
-    The stop arm projects outward from the bus.
+    The stop arm is visibly extended outward from the side of the bus.
     """
     stowed = "stowed"
     """
-    The stop arm is folded against the bus.
+    The stop arm is visibly folded flat against the side of the bus.
     """
 
 

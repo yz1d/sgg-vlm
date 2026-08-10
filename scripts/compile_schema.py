@@ -41,25 +41,23 @@ def _catalog_source(view: SchemaView) -> str:
     concrete_objects = _concrete_descendants(view, "SceneObject")
     concrete_relations = _concrete_descendants(view, "Relation")
 
-    detection_targets = []
+    object_attributes = _attribute_targets(view, concrete_objects)
+    object_targets = []
     for name in concrete_objects:
-        prompt = _annotation(view.get_class(name), "object_detection_prompt")
-        if prompt is not None:
-            detection_targets.append((name, prompt))
-    prompts: dict[str, str] = {}
-    for name, prompt in detection_targets:
-        previous = prompts.get(prompt.casefold())
-        if previous is not None:
-            raise ValueError(
-                f"Detection prompt {prompt!r} belongs to both {previous} and {name}"
+        definition = _required_class(view, name)
+        object_targets.append(
+            (
+                name,
+                _description(definition, name),
+                tuple(
+                    target
+                    for target in object_attributes
+                    if target[0] == name
+                ),
             )
-        prompts[prompt.casefold()] = name
+        )
 
     relation_targets = []
-    membership_by_object_range: dict[str, list[str]] = {}
-    road_object_relations = set(
-        _concrete_descendants(view, "RoadObjectRelation")
-    )
     for name in concrete_relations:
         definition = _required_class(view, name)
         subject_range = str(view.induced_slot("subject", name).range)
@@ -71,59 +69,14 @@ def _catalog_source(view: SchemaView) -> str:
                 subject_range,
                 object_range,
                 _annotation(definition, "exclusive_group"),
-                _annotation(definition, "relation_extraction") == "enabled",
-                _annotation(definition, "road_layout_extraction") == "enabled",
-                _annotation(definition, "topology_constraint"),
                 _annotation(definition, "symmetric") == "enabled",
             )
         )
-        if name in road_object_relations:
-            membership_by_object_range.setdefault(object_range, []).append(name)
-
-    road_layout_attributes = _attribute_targets(
-        view,
-        concrete_objects,
-        extraction_annotation="road_layout_extraction",
-    )
-    relation_attributes = _attribute_targets(
-        view,
-        concrete_objects,
-        extraction_annotation="relation_extraction",
-    )
-
-    road_layout_targets = []
-    for name in _concrete_descendants(view, "RoadObject"):
-        definition = _required_class(view, name)
-        if _annotation(definition, "road_layout_extraction") != "enabled":
-            continue
-        memberships = membership_by_object_range.get(name, [])
-        if len(memberships) != 1:
-            raise ValueError(
-                f"Road layout object {name} needs exactly one membership relation, "
-                f"found {memberships}"
-            )
-        road_layout_targets.append(
-            (
-                name,
-                _description(definition, name),
-                memberships[0],
-                _snake_case(name),
-                tuple(
-                    target
-                    for target in road_layout_attributes
-                    if target[0] == name
-                ),
-            )
-        )
-
     model_names = {
         *concrete_objects,
         *concrete_relations,
-        *(name for name, _ in detection_targets),
         *(item for target in relation_targets for item in target[:1] + target[2:4]),
-        *(item for target in road_layout_targets for item in target[:1] + target[2:3]),
-        *(target[0] for target in road_layout_attributes),
-        *(target[0] for target in relation_attributes),
+        *(target[0] for target in object_attributes),
     }
 
     lines = [
@@ -134,35 +87,19 @@ def _catalog_source(view: SchemaView) -> str:
         ")",
         "from src.graph.ontology import (",
         "    AttributeValue,",
-        "    DetectionTarget,",
         "    ObjectAttributeTarget,",
+        "    ObjectTarget,",
         "    RelationTarget,",
-        "    RoadLayoutTarget,",
         ")",
         "",
-        "",
-        "DETECTION_TARGETS = (",
+        "OBJECT_TARGETS = (",
     ]
-    for name, prompt in sorted(detection_targets, key=lambda item: item[1].casefold()):
+    for name, description, attributes in sorted(object_targets):
         lines.extend(
             [
-                "    DetectionTarget(",
-                f"        model={name},",
-                f"        prompt={prompt!r},",
-                "    ),",
-            ]
-        )
-    lines.extend([")", "", "", "ROAD_LAYOUT_TARGETS = ("])
-    for name, description, membership, prefix, attributes in sorted(
-        road_layout_targets
-    ):
-        lines.extend(
-            [
-                "    RoadLayoutTarget(",
+                "    ObjectTarget(",
                 f"        model={name},",
                 f"        description={description!r},",
-                f"        membership_model={membership},",
-                f"        id_prefix={prefix!r},",
                 "        attributes=(",
             ]
         )
@@ -175,9 +112,6 @@ def _catalog_source(view: SchemaView) -> str:
         subject_range,
         object_range,
         exclusive_group,
-        relation_extraction,
-        road_layout_extraction,
-        topology_constraint,
         symmetric,
     ) in sorted(relation_targets):
         lines.extend(
@@ -188,15 +122,10 @@ def _catalog_source(view: SchemaView) -> str:
                 f"        subject_model={subject_range},",
                 f"        object_model={object_range},",
                 f"        exclusive_group={exclusive_group!r},",
-                f"        relation_extraction={relation_extraction!r},",
-                f"        road_layout_extraction={road_layout_extraction!r},",
-                f"        topology_constraint={topology_constraint!r},",
                 f"        symmetric={symmetric!r},",
                 "    ),",
             ]
         )
-    lines.extend([")", "", "", "OBJECT_ATTRIBUTE_TARGETS = ("])
-    _append_attribute_targets(lines, relation_attributes, indent="    ")
     lines.extend([")", ""])
     return "\n".join(lines)
 
@@ -204,11 +133,8 @@ def _catalog_source(view: SchemaView) -> str:
 def _attribute_targets(
     view: SchemaView,
     concrete_objects: tuple[str, ...],
-    *,
-    extraction_annotation: str,
-) -> list[tuple[str, str, str, bool, list[tuple[str, str, str]]]]:
+) -> list[tuple[str, str, str, bool, list[tuple[str, str]]]]:
     targets = []
-    prompt_annotation = extraction_annotation + "_prompt"
     system_fields = {"id", "type", "bbox", "track_id", "provenance"}
     for name in concrete_objects:
         declared_slots: dict[str, Any] = {}
@@ -219,32 +145,17 @@ def _attribute_targets(
         for slot_name, slot in declared_slots.items():
             if slot_name in system_fields:
                 continue
-            if _annotation(slot, extraction_annotation) != "enabled":
+            enum_definition = view.get_enum(slot.range)
+            if enum_definition is None:
                 continue
             if slot.multivalued:
                 raise ValueError(
-                    f"Extracted object attribute {name}.{slot_name} cannot be multivalued"
+                    f"Enum object attribute {name}.{slot_name} cannot be multivalued"
                 )
-            enum_definition = view.get_enum(slot.range)
-            if enum_definition is None:
-                raise ValueError(
-                    f"Extracted object attribute {name}.{slot_name} must use an enum"
-                )
-            values = []
-            for value, permissible in enum_definition.permissible_values.items():
-                prompt = _annotation(permissible, prompt_annotation)
-                if prompt is None:
-                    raise ValueError(
-                        f"Attribute value {enum_definition.name}.{value} needs a "
-                        f"{prompt_annotation} annotation"
-                    )
-                values.append(
-                    (
-                        str(value),
-                        permissible.description or str(value),
-                        prompt,
-                    )
-                )
+            values = [
+                (str(value), permissible.description or str(value))
+                for value, permissible in enum_definition.permissible_values.items()
+            ]
             targets.append(
                 (
                     name,
@@ -274,13 +185,12 @@ def _append_attribute_targets(
                 f"{indent}    values=(",
             ]
         )
-        for value, value_description, prompt in values:
+        for value, value_description in values:
             lines.extend(
                 [
                     f"{indent}        AttributeValue(",
                     f"{indent}            value={value!r},",
                     f"{indent}            description={value_description!r},",
-                    f"{indent}            prompt={prompt!r},",
                     f"{indent}        ),",
                 ]
             )
@@ -363,10 +273,6 @@ def _description(definition: Any, name: str) -> str:
     if not isinstance(description, str) or not description.strip():
         raise ValueError(f"LinkML class {name} needs a description")
     return description.strip()
-
-
-def _snake_case(value: str) -> str:
-    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
 
 
 def _write(path: Path, content: str) -> None:

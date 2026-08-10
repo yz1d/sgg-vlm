@@ -25,55 +25,39 @@ from src.graph._generated.models import (
 )
 from src.graph.ontology import (
     AttributeValue,
-    DetectionTarget,
     ObjectAttributeTarget,
+    ObjectTarget,
     RelationTarget,
-    RoadLayoutTarget,
 )
 
-
-DETECTION_TARGETS = (
-    DetectionTarget(
-        model=RoadBlockage,
-        prompt='blocked road area',
-    ),
-    DetectionTarget(
+OBJECT_TARGETS = (
+    ObjectTarget(
         model=Bus,
-        prompt='bus',
+        description='A motorized vehicle designed to carry multiple passengers.',
+        attributes=(
+        ),
     ),
-    DetectionTarget(
+    ObjectTarget(
         model=Car,
-        prompt='car',
+        description='A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.',
+        attributes=(
+        ),
     ),
-    DetectionTarget(
+    ObjectTarget(
         model=Cyclist,
-        prompt='cyclist',
+        description='A person riding a bicycle.',
+        attributes=(
+        ),
     ),
-    DetectionTarget(
-        model=Motorcycle,
-        prompt='motorcycle',
+    ObjectTarget(
+        model=EgoVehicle,
+        description='The observing vehicle and reference object for spatial relations.',
+        attributes=(
+        ),
     ),
-    DetectionTarget(
-        model=Pedestrian,
-        prompt='pedestrian',
-    ),
-    DetectionTarget(
-        model=SchoolBus,
-        prompt='school bus',
-    ),
-    DetectionTarget(
-        model=Truck,
-        prompt='truck',
-    ),
-)
-
-
-ROAD_LAYOUT_TARGETS = (
-    RoadLayoutTarget(
+    ObjectTarget(
         model=Lane,
         description="A semantic traffic lane relevant to ego's immediate driving situation.",
-        membership_model=InLane,
-        id_prefix='lane',
         attributes=(
             ObjectAttributeTarget(
                 object_model=Lane,
@@ -84,20 +68,63 @@ ROAD_LAYOUT_TARGETS = (
                     AttributeValue(
                         value='same_as_ego',
                         description="Traffic travels approximately in ego's direction.",
-                        prompt='Traffic in this lane travels in approximately the same direction as ego.',
                     ),
                     AttributeValue(
                         value='opposite_to_ego',
                         description="Traffic travels approximately opposite ego's direction.",
-                        prompt='Traffic in this lane travels in approximately the opposite direction from ego.',
                     ),
                     AttributeValue(
                         value='crossing',
                         description="Traffic crosses ego's general direction.",
-                        prompt="Traffic in this lane crosses ego's general direction.",
                     ),
                 ),
             ),
+        ),
+    ),
+    ObjectTarget(
+        model=Motorcycle,
+        description='A motorized vehicle designed primarily for passenger transportation on two or three wheels.',
+        attributes=(
+        ),
+    ),
+    ObjectTarget(
+        model=Pedestrian,
+        description='A person on foot in the traffic scene.',
+        attributes=(
+        ),
+    ),
+    ObjectTarget(
+        model=RoadBlockage,
+        description='A contiguous visible road area unavailable for normal vehicle travel.',
+        attributes=(
+        ),
+    ),
+    ObjectTarget(
+        model=SchoolBus,
+        description='A bus used to transport students.',
+        attributes=(
+            ObjectAttributeTarget(
+                object_model=SchoolBus,
+                name='stop_arm_position',
+                description='Visible position of the school bus stop arm.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='deployed',
+                        description='The stop arm is visibly extended outward from the side of the bus.',
+                    ),
+                    AttributeValue(
+                        value='stowed',
+                        description='The stop arm is visibly folded flat against the side of the bus.',
+                    ),
+                ),
+            ),
+        ),
+    ),
+    ObjectTarget(
+        model=Truck,
+        description='A motorized vehicle designed primarily to transport cargo.',
+        attributes=(
         ),
     ),
 )
@@ -110,9 +137,6 @@ RELATION_TARGETS = (
         subject_model=SceneObject,
         object_model=EgoVehicle,
         exclusive_group='longitudinal',
-        relation_extraction=True,
-        road_layout_extraction=False,
-        topology_constraint=None,
         symmetric=False,
     ),
     RelationTarget(
@@ -121,9 +145,6 @@ RELATION_TARGETS = (
         subject_model=SceneObject,
         object_model=EgoVehicle,
         exclusive_group='longitudinal',
-        relation_extraction=True,
-        road_layout_extraction=False,
-        topology_constraint=None,
         symmetric=False,
     ),
     RelationTarget(
@@ -132,9 +153,6 @@ RELATION_TARGETS = (
         subject_model=SceneObject,
         object_model=Lane,
         exclusive_group='lane_membership',
-        relation_extraction=False,
-        road_layout_extraction=False,
-        topology_constraint=None,
         symmetric=False,
     ),
     RelationTarget(
@@ -143,9 +161,6 @@ RELATION_TARGETS = (
         subject_model=Lane,
         object_model=Lane,
         exclusive_group=None,
-        relation_extraction=False,
-        road_layout_extraction=True,
-        topology_constraint='parallel_without_physical_separator',
         symmetric=False,
     ),
     RelationTarget(
@@ -154,9 +169,6 @@ RELATION_TARGETS = (
         subject_model=SceneObject,
         object_model=EgoVehicle,
         exclusive_group='lateral',
-        relation_extraction=True,
-        road_layout_extraction=False,
-        topology_constraint=None,
         symmetric=False,
     ),
     RelationTarget(
@@ -165,9 +177,6 @@ RELATION_TARGETS = (
         subject_model=Lane,
         object_model=Lane,
         exclusive_group=None,
-        relation_extraction=False,
-        road_layout_extraction=True,
-        topology_constraint=None,
         symmetric=True,
     ),
     RelationTarget(
@@ -176,31 +185,6 @@ RELATION_TARGETS = (
         subject_model=SceneObject,
         object_model=EgoVehicle,
         exclusive_group='lateral',
-        relation_extraction=True,
-        road_layout_extraction=False,
-        topology_constraint=None,
         symmetric=False,
-    ),
-)
-
-
-OBJECT_ATTRIBUTE_TARGETS = (
-    ObjectAttributeTarget(
-        object_model=SchoolBus,
-        name='stop_arm_position',
-        description='Visible position of the school bus stop arm.',
-        required=False,
-        values=(
-            AttributeValue(
-                value='deployed',
-                description='The stop arm projects outward from the bus.',
-                prompt='The stop arm is visibly extended outward from the side of the bus.',
-            ),
-            AttributeValue(
-                value='stowed',
-                description='The stop arm is folded against the bus.',
-                prompt='The stop arm is visibly folded flat against the side of the bus.',
-            ),
-        ),
     ),
 )

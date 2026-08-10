@@ -70,50 +70,34 @@ classes:
   Car:
     description: A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.
     is_a: PotentiallyMovingObject
-    annotations:
-      object_detection_prompt: car
 
   Truck:
     description: A motorized vehicle designed primarily to transport cargo.
     is_a: PotentiallyMovingObject
-    annotations:
-      object_detection_prompt: truck
 
   Bus:
     description: A motorized vehicle designed to carry multiple passengers.
     is_a: PotentiallyMovingObject
-    annotations:
-      object_detection_prompt: bus
 
   SchoolBus:
     description: A bus used to transport students.
     is_a: Bus
-    annotations:
-      object_detection_prompt: school bus
     attributes:
       stop_arm_position:
         description: Visible position of the school bus stop arm.
         range: StopArmPosition
-        annotations:
-          relation_extraction: enabled
 
   Motorcycle:
     description: A motorized vehicle designed primarily for passenger transportation on two or three wheels.
     is_a: PotentiallyMovingObject
-    annotations:
-      object_detection_prompt: motorcycle
 
   Cyclist:
     description: A person riding a bicycle.
     is_a: PotentiallyMovingObject
-    annotations:
-      object_detection_prompt: cyclist
 
   Pedestrian:
     description: A person on foot in the traffic scene.
     is_a: PotentiallyMovingObject
-    annotations:
-      object_detection_prompt: pedestrian
 
   RoadObject:
     description: A road surface, road limitation, or road structure represented in the scene.
@@ -126,21 +110,15 @@ classes:
     slot_usage:
       bbox:
         required: true
-    annotations:
-      object_detection_prompt: blocked road area
 
   Lane:
     description: A semantic traffic lane relevant to ego's immediate driving situation.
     is_a: RoadObject
-    annotations:
-      road_layout_extraction: enabled
     attributes:
       direction:
         description: Traffic direction in this lane relative to ego's direction.
         range: LaneDirection
         required: true
-        annotations:
-          road_layout_extraction: enabled
 
   StaticObject:
     description: A fixed landmark, traffic sign, sign board, or traffic light.
@@ -167,25 +145,15 @@ enums:
     permissible_values:
       same_as_ego:
         description: Traffic travels approximately in ego's direction.
-        annotations:
-          road_layout_extraction_prompt: Traffic in this lane travels in approximately the same direction as ego.
       opposite_to_ego:
         description: Traffic travels approximately opposite ego's direction.
-        annotations:
-          road_layout_extraction_prompt: Traffic in this lane travels in approximately the opposite direction from ego.
       crossing:
         description: Traffic crosses ego's general direction.
-        annotations:
-          road_layout_extraction_prompt: Traffic in this lane crosses ego's general direction.
 
   StopArmPosition:
     description: Supported positions of a school bus stop arm.
     permissible_values:
       deployed:
-        description: The stop arm projects outward from the bus.
-        annotations:
-          relation_extraction_prompt: The stop arm is visibly extended outward from the side of the bus.
+        description: The stop arm is visibly extended outward from the side of the bus.
       stowed:
-        description: The stop arm is folded against the bus.
-        annotations:
-          relation_extraction_prompt: The stop arm is visibly folded flat against the side of the bus.
+        description: The stop arm is visibly folded flat against the side of the bus.

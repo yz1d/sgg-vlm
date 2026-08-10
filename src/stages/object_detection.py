@@ -8,7 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
-from src.graph._generated.catalog import DETECTION_TARGETS
+from src.graph._generated.catalog import OBJECT_TARGETS
 from src.graph._generated.models import (
     BoundingBox2D,
     ObjectDecision,
@@ -24,14 +24,13 @@ from src.stages.vlm_helper import (
 )
 from src.traces import JsonValue, Trace
 
-
 NormalizedCoordinate = Annotated[float, Field(ge=0, le=1000)]
 
 
 class DetectionProposal(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    label: str
+    type: str
     bbox: list[NormalizedCoordinate] = Field(min_length=4, max_length=4)
 
 
@@ -58,16 +57,22 @@ class ObjectDetectionStage:
         self.min_object_area_ratio = min_object_area_ratio
 
     def run(self, frame: Frame) -> StageOutput:
-        targets = DETECTION_TARGETS
-        if not targets:
-            raise ValueError("The graph schema defines no object-detection prompts")
-        labels = tuple(target.prompt for target in targets)
-        if len({label.casefold() for label in labels}) != len(labels):
-            raise ValueError("Object-detection labels must be unique")
-        target_by_label = {target.prompt.casefold(): target for target in targets}
-        prompt = _build_prompt(labels)
+        targets = tuple(
+            target
+            for target in OBJECT_TARGETS
+            if target.model.model_fields["bbox"].is_required()
+        )
+        target_by_type = {target.model.__name__: target for target in targets}
+        vocabulary: list[JsonValue] = [
+            {
+                "type": target.model.__name__,
+                "description": target.description,
+            }
+            for target in targets
+        ]
+        prompt = _build_prompt(vocabulary)
         stage_input: dict[str, JsonValue] = {
-            "labels": list(labels),
+            "object_types": vocabulary,
             "coordinate_space": "normalized_0_1000",
             "min_object_area_ratio": self.min_object_area_ratio,
         }
@@ -75,7 +80,7 @@ class ObjectDetectionStage:
             VlmRequest(
                 prompt=prompt,
                 images=(build_original_vlm_image(frame),),
-                response_schema=_response_schema(labels),
+                response_schema=_response_schema(tuple(target_by_type)),
             )
         )
         proposals = DetectionResponse.model_validate(
@@ -94,10 +99,10 @@ class ObjectDetectionStage:
         discarded_count = 0
         image_area = image_width * image_height
         for proposal in proposals.detections:
-            target = target_by_label.get(proposal.label.strip().casefold())
+            target = target_by_type.get(proposal.type)
             if target is None:
                 raise ValueError(
-                    f"VLM detector returned an unrequested label: {proposal.label!r}"
+                    f"VLM detector returned an unrequested type: {proposal.type!r}"
                 )
             normalized_bbox = tuple(proposal.bbox)
             x_min, y_min, x_max, y_max = normalized_bbox
@@ -127,7 +132,7 @@ class ObjectDetectionStage:
             if area_ratio < self.min_object_area_ratio:
                 filtered.append(
                     {
-                        "label": proposal.label,
+                        "type": proposal.type,
                         "bbox_xyxy": list(bbox),
                         "area_ratio": area_ratio,
                         "reason": "below_min_object_area_ratio",
@@ -175,7 +180,6 @@ class ObjectDetectionStage:
                 {
                     "object_id": object_id,
                     "type": object_.type,
-                    "label": proposal.label,
                     "bbox_xyxy": list(bbox),
                     "area_ratio": area_ratio,
                 }
@@ -210,28 +214,27 @@ class ObjectDetectionStage:
         )
 
 
-def _build_prompt(labels: tuple[str, ...]) -> str:
-    label_json = json.dumps(labels, separators=(",", ":"))
+def _build_prompt(vocabulary: list[JsonValue]) -> str:
+    vocabulary_json = json.dumps(vocabulary, separators=(",", ":"))
     return f"""Inspect this front-camera road image and locate every requested scene object.
 
-Use exactly this label vocabulary: {label_json}
+Use only object types from this schema vocabulary: {vocabulary_json}
 Include small or partly occluded objects when they are visible.
-Classify each physical road user once. Use school bus instead of bus when applicable.
-Treat a blocked road area as one contiguous area unavailable for normal vehicle travel.
-For a blocked road area, box the full area instead of each cone, barrier, worker, or vehicle.
-Use a tight box around the visible extent. Do not infer objects outside the image.
-Return JSON as detections with one label and bbox per object.
+Classify each physical object once. Use the most specific applicable schema type.
+Use a tight box around the visible extent of the represented object or area.
+Do not infer objects outside the image.
+Return JSON as detections with one type and bbox per object.
 Coordinates use [x_min,y_min,x_max,y_max], normalized from 0 through 1000.
 The top-left image corner is [0,0]. The bottom-right corner is [1000,1000].
 """
 
 
-def _response_schema(labels: tuple[str, ...]) -> dict[str, JsonValue]:
+def _response_schema(types: tuple[str, ...]) -> dict[str, JsonValue]:
     schema = DetectionResponse.model_json_schema()
     proposal = cast(dict[str, Any], schema["$defs"]["DetectionProposal"])
     properties = cast(dict[str, Any], proposal["properties"])
-    label_schema = cast(dict[str, Any], properties["label"])
-    label_schema["enum"] = list(labels)
+    type_schema = cast(dict[str, Any], properties["type"])
+    type_schema["enum"] = list(types)
     return cast(dict[str, JsonValue], schema)
 
 
