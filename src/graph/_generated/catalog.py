@@ -7,6 +7,7 @@ from src.graph._generated.models import (
     Behind,
     Bus,
     Car,
+    ConstructionWorker,
     Cyclist,
     EgoVehicle,
     InFrontOf,
@@ -17,6 +18,7 @@ from src.graph._generated.models import (
     Motorcycle,
     Overlaps,
     Pedestrian,
+    PoliceOfficer,
     RightOf,
     RoadBlockage,
     SceneObject,
@@ -40,6 +42,12 @@ OBJECT_TARGETS = (
     ObjectTarget(
         model=Car,
         description='A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.',
+        attributes=(
+        ),
+    ),
+    ObjectTarget(
+        model=ConstructionWorker,
+        description='A person visibly performing construction or maintenance work in the traffic scene.',
         attributes=(
         ),
     ),
@@ -90,6 +98,12 @@ OBJECT_TARGETS = (
     ObjectTarget(
         model=Pedestrian,
         description='A person on foot in the traffic scene.',
+        attributes=(
+        ),
+    ),
+    ObjectTarget(
+        model=PoliceOfficer,
+        description='A visibly identifiable police officer in the traffic scene.',
         attributes=(
         ),
     ),

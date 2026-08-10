@@ -99,6 +99,14 @@ classes:
     description: A person on foot in the traffic scene.
     is_a: PotentiallyMovingObject
 
+  ConstructionWorker:
+    description: A person visibly performing construction or maintenance work in the traffic scene.
+    is_a: PotentiallyMovingObject
+
+  PoliceOfficer:
+    description: A visibly identifiable police officer in the traffic scene.
+    is_a: PotentiallyMovingObject
+
   RoadObject:
     description: A road surface, road limitation, or road structure represented in the scene.
     is_a: SceneObject
