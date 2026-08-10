@@ -124,6 +124,20 @@ class ObjectDecision(str, Enum):
     """
 
 
+class VehicleOpeningState(str, Enum):
+    """
+    Visible state of the openable parts of a vehicle body.
+    """
+    open = "open"
+    """
+    At least one applicable vehicle opening is visibly open.
+    """
+    closed = "closed"
+    """
+    All applicable visible vehicle openings appear closed.
+    """
+
+
 class LaneDirection(str, Enum):
     """
     Traffic direction in a lane relative to ego's direction.
@@ -221,10 +235,23 @@ class EgoVehicle(SceneObject):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Car(PotentiallyMovingObject):
+class Vehicle(PotentiallyMovingObject):
+    """
+    A motorized vehicle represented in the traffic scene.
+    """
+    opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
+    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
+    type: Literal["Vehicle"] = Field(default="Vehicle", description="""Concrete LinkML class of this object.""")
+    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
+    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
+    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
+
+
+class Car(Vehicle):
     """
     A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.
     """
+    opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Car"] = Field(default="Car", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -232,10 +259,11 @@ class Car(PotentiallyMovingObject):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Truck(PotentiallyMovingObject):
+class Truck(Vehicle):
     """
     A motorized vehicle designed primarily to transport cargo.
     """
+    opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Truck"] = Field(default="Truck", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -243,10 +271,11 @@ class Truck(PotentiallyMovingObject):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Bus(PotentiallyMovingObject):
+class Bus(Vehicle):
     """
     A motorized vehicle designed to carry multiple passengers.
     """
+    opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Bus"] = Field(default="Bus", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -259,6 +288,7 @@ class SchoolBus(Bus):
     A bus used to transport students.
     """
     stop_arm_position: Optional[StopArmPosition] = Field(default=None, description="""Visible position of the school bus stop arm.""")
+    opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["SchoolBus"] = Field(default="SchoolBus", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -266,10 +296,11 @@ class SchoolBus(Bus):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class Motorcycle(PotentiallyMovingObject):
+class Motorcycle(Vehicle):
     """
     A motorized vehicle designed primarily for passenger transportation on two or three wheels.
     """
+    opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Motorcycle"] = Field(default="Motorcycle", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -505,6 +536,7 @@ ObjectProvenance.model_rebuild()
 SceneObject.model_rebuild()
 PotentiallyMovingObject.model_rebuild()
 EgoVehicle.model_rebuild()
+Vehicle.model_rebuild()
 Car.model_rebuild()
 Truck.model_rebuild()
 Bus.model_rebuild()

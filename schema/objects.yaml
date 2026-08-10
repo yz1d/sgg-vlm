@@ -67,17 +67,26 @@ classes:
       id:
         equals_string: ego
 
+  Vehicle:
+    description: A motorized vehicle represented in the traffic scene.
+    is_a: PotentiallyMovingObject
+    abstract: true
+    attributes:
+      opening_state:
+        description: Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.
+        range: VehicleOpeningState
+
   Car:
     description: A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.
-    is_a: PotentiallyMovingObject
+    is_a: Vehicle
 
   Truck:
     description: A motorized vehicle designed primarily to transport cargo.
-    is_a: PotentiallyMovingObject
+    is_a: Vehicle
 
   Bus:
     description: A motorized vehicle designed to carry multiple passengers.
-    is_a: PotentiallyMovingObject
+    is_a: Vehicle
 
   SchoolBus:
     description: A bus used to transport students.
@@ -89,7 +98,7 @@ classes:
 
   Motorcycle:
     description: A motorized vehicle designed primarily for passenger transportation on two or three wheels.
-    is_a: PotentiallyMovingObject
+    is_a: Vehicle
 
   Cyclist:
     description: A person riding a bicycle.
@@ -147,6 +156,14 @@ enums:
         description: The object has the selected cross-frame track identity.
       attributes:
         description: The object has the selected object-specific attribute values.
+
+  VehicleOpeningState:
+    description: Visible state of the openable parts of a vehicle body.
+    permissible_values:
+      open:
+        description: At least one applicable vehicle opening is visibly open.
+      closed:
+        description: All applicable visible vehicle openings appear closed.
 
   LaneDirection:
     description: Traffic direction in a lane relative to ego's direction.

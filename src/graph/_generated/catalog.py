@@ -37,12 +37,44 @@ OBJECT_TARGETS = (
         model=Bus,
         description='A motorized vehicle designed to carry multiple passengers.',
         attributes=(
+            ObjectAttributeTarget(
+                object_model=Bus,
+                name='opening_state',
+                description='Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='open',
+                        description='At least one applicable vehicle opening is visibly open.',
+                    ),
+                    AttributeValue(
+                        value='closed',
+                        description='All applicable visible vehicle openings appear closed.',
+                    ),
+                ),
+            ),
         ),
     ),
     ObjectTarget(
         model=Car,
         description='A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.',
         attributes=(
+            ObjectAttributeTarget(
+                object_model=Car,
+                name='opening_state',
+                description='Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='open',
+                        description='At least one applicable vehicle opening is visibly open.',
+                    ),
+                    AttributeValue(
+                        value='closed',
+                        description='All applicable visible vehicle openings appear closed.',
+                    ),
+                ),
+            ),
         ),
     ),
     ObjectTarget(
@@ -93,6 +125,22 @@ OBJECT_TARGETS = (
         model=Motorcycle,
         description='A motorized vehicle designed primarily for passenger transportation on two or three wheels.',
         attributes=(
+            ObjectAttributeTarget(
+                object_model=Motorcycle,
+                name='opening_state',
+                description='Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='open',
+                        description='At least one applicable vehicle opening is visibly open.',
+                    ),
+                    AttributeValue(
+                        value='closed',
+                        description='All applicable visible vehicle openings appear closed.',
+                    ),
+                ),
+            ),
         ),
     ),
     ObjectTarget(
@@ -133,12 +181,44 @@ OBJECT_TARGETS = (
                     ),
                 ),
             ),
+            ObjectAttributeTarget(
+                object_model=SchoolBus,
+                name='opening_state',
+                description='Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='open',
+                        description='At least one applicable vehicle opening is visibly open.',
+                    ),
+                    AttributeValue(
+                        value='closed',
+                        description='All applicable visible vehicle openings appear closed.',
+                    ),
+                ),
+            ),
         ),
     ),
     ObjectTarget(
         model=Truck,
         description='A motorized vehicle designed primarily to transport cargo.',
         attributes=(
+            ObjectAttributeTarget(
+                object_model=Truck,
+                name='opening_state',
+                description='Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='open',
+                        description='At least one applicable vehicle opening is visibly open.',
+                    ),
+                    AttributeValue(
+                        value='closed',
+                        description='All applicable visible vehicle openings appear closed.',
+                    ),
+                ),
+            ),
         ),
     ),
 )
