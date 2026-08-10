@@ -15,6 +15,7 @@ from src.graph._generated.models import (
     ObjectProvenance,
     SceneObject,
 )
+from src.graph.ontology import ObjectTarget
 from src.overlay import BoxAnnotation, render_box_overlay
 from src.stage import StageOutput
 from src.stages.vlm_helper import (
@@ -32,6 +33,7 @@ class DetectionProposal(BaseModel):
 
     type: str
     bbox: list[NormalizedCoordinate] = Field(min_length=4, max_length=4)
+    attributes: dict[str, str]
 
 
 class DetectionResponse(BaseModel):
@@ -67,6 +69,20 @@ class ObjectDetectionStage:
             {
                 "type": target.model.__name__,
                 "description": target.description,
+                "attributes": {
+                    attribute.name: {
+                        "description": attribute.description,
+                        "required": attribute.required,
+                        "values": [
+                            {
+                                "value": value.value,
+                                "description": value.description,
+                            }
+                            for value in attribute.values
+                        ],
+                    }
+                    for attribute in target.attributes
+                },
             }
             for target in targets
         ]
@@ -80,7 +96,7 @@ class ObjectDetectionStage:
             VlmRequest(
                 prompt=prompt,
                 images=(build_original_vlm_image(frame),),
-                response_schema=_response_schema(tuple(target_by_type)),
+                response_schema=_response_schema(targets),
             )
         )
         proposals = DetectionResponse.model_validate(
@@ -104,6 +120,33 @@ class ObjectDetectionStage:
                 raise ValueError(
                     f"VLM detector returned an unrequested type: {proposal.type!r}"
                 )
+            expected_attributes = {
+                attribute.name: attribute for attribute in target.attributes
+            }
+            required_attributes = {
+                name
+                for name, attribute in expected_attributes.items()
+                if attribute.required
+            }
+            if not required_attributes.issubset(proposal.attributes):
+                raise ValueError(
+                    f"{proposal.type} requires attributes "
+                    f"{sorted(required_attributes)}"
+                )
+            if not set(proposal.attributes).issubset(expected_attributes):
+                raise ValueError(
+                    f"{proposal.type} has unknown attributes "
+                    f"{sorted(set(proposal.attributes) - set(expected_attributes))}"
+                )
+            for name, value in proposal.attributes.items():
+                valid_values = {
+                    item.value for item in expected_attributes[name].values
+                }
+                if value not in valid_values:
+                    raise ValueError(
+                        f"Invalid value for {proposal.type}.{name}: {value!r}"
+                    )
+
             normalized_bbox = tuple(proposal.bbox)
             x_min, y_min, x_max, y_max = normalized_bbox
             if x_min >= x_max or y_min >= y_max:
@@ -154,6 +197,11 @@ class ObjectDetectionStage:
                     ObjectDecision.existence,
                     ObjectDecision.classification,
                     ObjectDecision.bounding_box,
+                    *(
+                        [ObjectDecision.attributes]
+                        if proposal.attributes
+                        else []
+                    ),
                 ],
             )
             object_ = target.model.model_validate(
@@ -166,6 +214,7 @@ class ObjectDetectionStage:
                         y_max=bbox[3],
                     ),
                     "provenance": [provenance],
+                    **proposal.attributes,
                 }
             )
             objects.append(object_)
@@ -181,6 +230,7 @@ class ObjectDetectionStage:
                     "object_id": object_id,
                     "type": object_.type,
                     "bbox_xyxy": list(bbox),
+                    "attributes": proposal.attributes,
                     "area_ratio": area_ratio,
                 }
             )
@@ -223,19 +273,69 @@ Include small or partly occluded objects when they are visible.
 Classify each physical object once. Use the most specific applicable schema type.
 Use a tight box around the visible extent of the represented object or area.
 Do not infer objects outside the image.
-Return JSON as detections with one type and bbox per object.
+Include required attributes. Omit optional attributes when the visual state is unclear.
+Return JSON as detections with one type, bbox, and attributes object per object.
 Coordinates use [x_min,y_min,x_max,y_max], normalized from 0 through 1000.
 The top-left image corner is [0,0]. The bottom-right corner is [1000,1000].
 """
 
 
-def _response_schema(types: tuple[str, ...]) -> dict[str, JsonValue]:
-    schema = DetectionResponse.model_json_schema()
-    proposal = cast(dict[str, Any], schema["$defs"]["DetectionProposal"])
-    properties = cast(dict[str, Any], proposal["properties"])
-    type_schema = cast(dict[str, Any], properties["type"])
-    type_schema["enum"] = list(types)
-    return cast(dict[str, JsonValue], schema)
+def _response_schema(
+    targets: tuple[ObjectTarget, ...],
+) -> dict[str, JsonValue]:
+    variants: list[dict[str, Any]] = []
+    for target in targets:
+        attribute_properties = {
+            attribute.name: {
+                "type": "string",
+                "enum": [value.value for value in attribute.values],
+            }
+            for attribute in target.attributes
+        }
+        required_attributes = [
+            attribute.name
+            for attribute in target.attributes
+            if attribute.required
+        ]
+        variants.append(
+            {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "type": {
+                        "type": "string",
+                        "enum": [target.model.__name__],
+                    },
+                    "bbox": {
+                        "type": "array",
+                        "items": {"type": "number", "minimum": 0, "maximum": 1000},
+                        "minItems": 4,
+                        "maxItems": 4,
+                    },
+                    "attributes": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": attribute_properties,
+                        "required": required_attributes,
+                    },
+                },
+                "required": ["type", "bbox", "attributes"],
+            }
+        )
+    return cast(
+        dict[str, JsonValue],
+        {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "detections": {
+                    "type": "array",
+                    "items": {"anyOf": variants},
+                }
+            },
+            "required": ["detections"],
+        },
+    )
 
 
 def _clip_bbox(

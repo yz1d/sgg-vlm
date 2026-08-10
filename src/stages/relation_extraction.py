@@ -8,17 +8,15 @@ from pydantic import BaseModel, ConfigDict
 
 from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
-from src.graph._generated.catalog import OBJECT_TARGETS, RELATION_TARGETS
+from src.graph._generated.catalog import RELATION_TARGETS
 from src.graph._generated.models import (
     EgoVehicle,
-    ObjectDecision,
-    ObjectProvenance,
     Provenance,
     Relation,
     SceneObject,
     SpatialRelation,
 )
-from src.graph.ontology import ObjectAttributeTarget, RelationTarget
+from src.graph.ontology import RelationTarget
 from src.stage import StageOutput
 from src.stages.vlm_helper import (
     build_request_trace,
@@ -36,23 +34,14 @@ class RelationProposal(BaseModel):
     type: str
 
 
-class ObjectAttributeProposal(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    subject: str
-    name: str
-    value: str
-
-
 class ExtractionResponse(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     relations: list[RelationProposal]
-    attributes: list[ObjectAttributeProposal]
 
 
 class RelationExtractionStage:
-    """Add object-to-ego relations and schema-defined object attributes."""
+    """Add object-to-ego relations."""
 
     name = "relation-extraction"
 
@@ -80,22 +69,11 @@ class RelationExtractionStage:
             for target in RELATION_TARGETS
             if issubclass(target.model, SpatialRelation)
         )
-        attribute_vocabulary = tuple(
-            attribute
-            for target in OBJECT_TARGETS
-            for attribute in target.attributes
-            if any(
-                isinstance(object_, attribute.object_model)
-                for object_ in objects
-            )
-        )
         identity_map = render_identity_map(frame)
         registry: list[JsonValue] = [
             {"id": object_.id, "type": object_.type} for object_ in objects
         ]
-        vocabulary = _vocabulary_payload(
-            relation_vocabulary, attribute_vocabulary
-        )
+        vocabulary = _vocabulary_payload(relation_vocabulary)
         prompt = _build_prompt(registry, vocabulary)
         stage_input: dict[str, JsonValue] = {
             "objects": registry,
@@ -110,7 +88,6 @@ class RelationExtractionStage:
                     Trace.json("request.json", {"skipped": "no visible scene objects"}),
                     Trace.bytes("identity-map.png", identity_map),
                     Trace.json("relations.json", []),
-                    Trace.json("object-attributes.json", []),
                 )
             )
 
@@ -121,7 +98,6 @@ class RelationExtractionStage:
                 response_schema=_response_schema(
                     objects,
                     relation_vocabulary,
-                    attribute_vocabulary,
                 ),
             )
         )
@@ -136,7 +112,6 @@ class RelationExtractionStage:
             proposals,
             object_by_id=object_by_id,
             relation_by_name=relation_by_name,
-            attribute_targets=attribute_vocabulary,
         )
 
         used_relation_ids = {relation.id for relation in frame.graph.relations}
@@ -172,41 +147,8 @@ class RelationExtractionStage:
                 )
             )
 
-        attribute_values_by_object: dict[str, dict[str, str]] = {}
-        for proposal in proposals.attributes:
-            attribute_values_by_object.setdefault(proposal.subject, {})[
-                proposal.name
-            ] = proposal.value
-
-        updated_objects: list[SceneObject] = []
-        normalized_attributes: list[JsonValue] = []
-        for object_id, attribute_values in attribute_values_by_object.items():
-            object_ = object_by_id[object_id]
-            payload = object_.model_dump(mode="python")
-            payload.update(attribute_values)
-            payload["provenance"] = [
-                *object_.provenance,
-                ObjectProvenance(
-                    source="vlm",
-                    stage=self.name,
-                    model=response.model,
-                    supports=[ObjectDecision.attributes],
-                ),
-            ]
-            updated = type(object_).model_validate(payload)
-            updated_objects.append(updated)
-            normalized_attributes.extend(
-                {
-                    "subject": object_id,
-                    "name": name,
-                    "value": value,
-                }
-                for name, value in attribute_values.items()
-            )
-
         request_trace = build_request_trace(response)
         return StageOutput(
-            objects=tuple(updated_objects),
             relations=tuple(relations),
             traces=(
                 Trace.text("prompt.txt", prompt),
@@ -216,14 +158,12 @@ class RelationExtractionStage:
                 Trace.json("response.raw.json", response.raw),
                 Trace.text("response.txt", response.text),
                 Trace.json("relations.json", normalized_relations),
-                Trace.json("object-attributes.json", normalized_attributes),
             ),
         )
 
 
 def _vocabulary_payload(
     relations: tuple[RelationTarget, ...],
-    attributes: tuple[ObjectAttributeTarget, ...],
 ) -> dict[str, JsonValue]:
     return {
         "relation_types": [
@@ -235,21 +175,6 @@ def _vocabulary_payload(
             }
             for target in relations
         ],
-        "object_attributes": [
-            {
-                "object_type": target.object_model.__name__,
-                "name": target.name,
-                "description": target.description,
-                "values": [
-                    {
-                        "value": value.value,
-                        "description": value.description,
-                    }
-                    for value in target.values
-                ],
-            }
-            for target in attributes
-        ],
     }
 
 
@@ -260,9 +185,8 @@ def _build_prompt(
 
 The first image is original. The second labels visible scene objects. Ego is the camera vehicle.
 Every relation describes one registry object relative to ego.
-Object attributes apply only to compatible object types in the vocabulary.
-Use only registry IDs, relation types, attribute names, and attribute values from the vocabulary.
-Return only clear visual facts. Omit uncertain attributes and relations.
+Use only registry IDs and relation types from the vocabulary.
+Return only clear visual facts. Omit uncertain relations.
 
 Scene-object registry:
 {json.dumps(registry, separators=(",", ":"))}
@@ -277,7 +201,6 @@ def _validate_proposals(
     *,
     object_by_id: Mapping[str, SceneObject],
     relation_by_name: dict[str, RelationTarget],
-    attribute_targets: tuple[ObjectAttributeTarget, ...],
 ) -> None:
     relation_keys: set[tuple[str, str]] = set()
     groups: set[tuple[str, str]] = set()
@@ -305,40 +228,10 @@ def _validate_proposals(
                 )
             groups.add(group_key)
 
-    attribute_keys: set[tuple[str, str]] = set()
-    for proposal in proposals.attributes:
-        object_ = object_by_id.get(proposal.subject)
-        if object_ is None:
-            raise ValueError(
-                f"Object attribute has unknown subject: {proposal.subject}"
-            )
-        candidates = [
-            target
-            for target in attribute_targets
-            if target.name == proposal.name
-            and isinstance(object_, target.object_model)
-        ]
-        if len(candidates) != 1:
-            raise ValueError(
-                f"Unknown attribute {proposal.name!r} for {object_.type}"
-            )
-        target = candidates[0]
-        valid_values = {value.value for value in target.values}
-        if proposal.value not in valid_values:
-            raise ValueError(
-                f"Invalid value for {object_.type}.{proposal.name}: "
-                f"{proposal.value!r}"
-            )
-        key = (proposal.subject, proposal.name)
-        if key in attribute_keys:
-            raise ValueError(f"Duplicate object attribute proposal: {key}")
-        attribute_keys.add(key)
-
 
 def _response_schema(
     objects: list[SceneObject],
     relations: tuple[RelationTarget, ...],
-    attributes: tuple[ObjectAttributeTarget, ...],
 ) -> dict[str, JsonValue]:
     relation_variants: list[dict[str, Any]] = []
     for target in relations:
@@ -364,36 +257,8 @@ def _response_schema(
             }
         )
 
-    attribute_variants: list[dict[str, Any]] = []
-    for target in attributes:
-        subjects = [
-            object_.id
-            for object_ in objects
-            if isinstance(object_, target.object_model)
-        ]
-        if not subjects:
-            continue
-        attribute_variants.append(
-            {
-                "type": "object",
-                "additionalProperties": False,
-                "properties": {
-                    "subject": {"type": "string", "enum": subjects},
-                    "name": {"type": "string", "enum": [target.name]},
-                    "value": {
-                        "type": "string",
-                        "enum": [value.value for value in target.values],
-                    },
-                },
-                "required": ["subject", "name", "value"],
-            }
-        )
-
     relation_items: dict[str, Any] = (
         {"anyOf": relation_variants} if relation_variants else {}
-    )
-    attribute_items: dict[str, Any] = (
-        {"anyOf": attribute_variants} if attribute_variants else {}
     )
     return cast(
         dict[str, JsonValue],
@@ -406,12 +271,7 @@ def _response_schema(
                     "items": relation_items,
                     **({"maxItems": 0} if not relation_variants else {}),
                 },
-                "attributes": {
-                    "type": "array",
-                    "items": attribute_items,
-                    **({"maxItems": 0} if not attribute_variants else {}),
-                },
             },
-            "required": ["relations", "attributes"],
+            "required": ["relations"],
         },
     )
