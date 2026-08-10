@@ -7,12 +7,12 @@ stages:
     reasoning:
       mode: disabled
   road_layout:
-    platform: gemini
+    platform: qwen
     reasoning:
       mode: enabled
       effort: low
   relations:
-    platform: gemini
+    platform: qwen
     reasoning:
       mode: enabled
       effort: low

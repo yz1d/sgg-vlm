@@ -282,20 +282,11 @@ def _snake_case(value: str) -> str:
 def _build_prompt(
     registry: list[JsonValue], vocabulary: dict[str, JsonValue]
 ) -> str:
-    return f"""Extract the local lane topology relevant to ego.
+    return f"""Extract clear local lane topology for ego, the camera vehicle, from the original first image and labeled second image.
+Include ego's lane and other relevant lanes. Assign local IDs for relations and use only registry IDs as occupants.
 
-The first image is original. The second labels visible scene objects. Ego is the camera vehicle.
-Create a short local ID for each lane. Use those local IDs in lane relations.
-Include ego's lane and lanes relevant to ego's immediate driving situation.
-An unoccupied lane can have an empty occupants list.
-Use relation descriptions from the schema vocabulary.
-Use only registry IDs as occupants. Return only clear facts.
-
-Scene-object registry:
-{json.dumps(registry, separators=(",", ":"))}
-
-Schema vocabulary:
-{json.dumps(vocabulary, separators=(",", ":"))}
+Registry: {json.dumps(registry, separators=(",", ":"))}
+Vocabulary: {json.dumps(vocabulary, separators=(",", ":"))}
 """
 
 
@@ -443,7 +434,6 @@ def _response_schema(
                     "occupants": {
                         "type": "array",
                         "items": {"type": "string"},
-                        "uniqueItems": True,
                     },
                 },
                 "required": ["local_id", "type", "attributes", "occupants"],

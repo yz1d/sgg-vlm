@@ -181,18 +181,11 @@ def _vocabulary_payload(
 def _build_prompt(
     registry: list[JsonValue], vocabulary: dict[str, JsonValue]
 ) -> str:
-    return f"""Extract clear schema-defined facts for these visible scene objects.
+    return f"""Determine each registry object's clear spatial relations to ego, the camera vehicle.
+Use the original first image and the labeled second image. Omit uncertain relations.
 
-The first image is original. The second labels visible scene objects. Ego is the camera vehicle.
-Every relation describes one registry object relative to ego.
-Use only registry IDs and relation types from the vocabulary.
-Return only clear visual facts. Omit uncertain relations.
-
-Scene-object registry:
-{json.dumps(registry, separators=(",", ":"))}
-
-Schema vocabulary:
-{json.dumps(vocabulary, separators=(",", ":"))}
+Registry: {json.dumps(registry, separators=(",", ":"))}
+Vocabulary: {json.dumps(vocabulary, separators=(",", ":"))}
 """
 
 
