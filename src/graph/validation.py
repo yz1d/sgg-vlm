@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from src.graph._generated.catalog import RELATION_TARGETS
-from src.graph._generated.models import EgoVehicle, LaneDirection, Scene
+from src.graph._generated.models import EgoVehicle, LaneDirection, LeftAdjacentTo, Scene
 
 
 class GraphValidationError(ValueError):
@@ -108,7 +108,7 @@ def validate_scene(graph: Scene) -> None:
                 raise GraphValidationError(
                     f"Relation {relation.id} does not use canonical endpoint order"
                 )
-        if target.topology_constraint == "parallel_without_physical_separator":
+        if isinstance(relation, LeftAdjacentTo):
             subject_direction = getattr(subject, "direction", None)
             object_direction = getattr(object_, "direction", None)
             if (

@@ -1,22 +1,27 @@
 from __future__ import annotations
 
 import json
+import re
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
-from src.graph._generated.catalog import RELATION_TARGETS, ROAD_LAYOUT_TARGETS
+from src.graph._generated.catalog import OBJECT_TARGETS, RELATION_TARGETS
 from src.graph._generated.models import (
     LaneDirection,
+    LaneRelation,
+    LeftAdjacentTo,
     ObjectDecision,
     ObjectProvenance,
     Provenance,
     Relation,
+    RoadObject,
+    RoadObjectRelation,
     SceneObject,
 )
-from src.graph.ontology import RelationTarget, RoadLayoutTarget
+from src.graph.ontology import ObjectTarget, RelationTarget
 from src.stage import StageOutput
 from src.stages.vlm_helper import (
     build_request_trace,
@@ -70,20 +75,38 @@ class RoadLayoutExtractionStage:
             {"id": object_.id, "type": object_.type}
             for object_ in registry_objects
         ]
+        object_targets = tuple(
+            target
+            for target in OBJECT_TARGETS
+            if issubclass(target.model, RoadObject)
+            and not target.model.model_fields["bbox"].is_required()
+        )
         target_by_name = {
-            target.model.__name__: target for target in ROAD_LAYOUT_TARGETS
+            target.model.__name__: target for target in object_targets
         }
         relation_targets = tuple(
             target
             for target in RELATION_TARGETS
-            if target.road_layout_extraction
+            if issubclass(target.model, LaneRelation)
         )
+        membership_models = {}
+        for target in object_targets:
+            candidates = [
+                relation.model
+                for relation in RELATION_TARGETS
+                if issubclass(relation.model, RoadObjectRelation)
+                and issubclass(target.model, relation.object_model)
+            ]
+            if len(candidates) != 1:
+                raise ValueError(
+                    f"Road layout type {target.model.__name__} needs exactly one "
+                    f"membership relation, found {[model.__name__ for model in candidates]}"
+                )
+            membership_models[target.model] = candidates[0]
         relation_by_name = {
             target.model.__name__: target for target in relation_targets
         }
-        vocabulary = _vocabulary_payload(
-            tuple(target_by_name.values()), relation_targets
-        )
+        vocabulary = _vocabulary_payload(object_targets, relation_targets)
         prompt = _build_prompt(registry, vocabulary)
         stage_input: dict[str, JsonValue] = {
             "objects": registry,
@@ -95,7 +118,7 @@ class RoadLayoutExtractionStage:
                 prompt=prompt,
                 images=build_vlm_images(frame, identity_map),
                 response_schema=_response_schema(
-                    tuple(target_by_name.values()), relation_targets
+                    object_targets, relation_targets
                 ),
             )
         )
@@ -116,7 +139,7 @@ class RoadLayoutExtractionStage:
         normalized_objects: list[JsonValue] = []
         for proposal in proposals.objects:
             target = target_by_name[proposal.type]
-            prefix = target.id_prefix
+            prefix = _snake_case(target.model.__name__)
             index = next_object_index[proposal.type]
             while f"{prefix}_{index:03d}" in used_object_ids:
                 index += 1
@@ -156,7 +179,7 @@ class RoadLayoutExtractionStage:
             object_id = local_id_map[proposal.local_id]
             target = target_by_name[proposal.type]
             relation_specs.extend(
-                (target.membership_model, occupant, object_id)
+                (membership_models[target.model], occupant, object_id)
                 for occupant in proposal.occupants
             )
         for proposal in proposals.relations:
@@ -217,7 +240,7 @@ class RoadLayoutExtractionStage:
 
 
 def _vocabulary_payload(
-    object_targets: tuple[RoadLayoutTarget, ...],
+    object_targets: tuple[ObjectTarget, ...],
     relation_targets: tuple[RelationTarget, ...],
 ) -> dict[str, JsonValue]:
     return {
@@ -233,7 +256,6 @@ def _vocabulary_payload(
                             {
                                 "value": value.value,
                                 "description": value.description,
-                                "visual_prompt": value.prompt,
                             }
                             for value in attribute.values
                         ],
@@ -247,12 +269,14 @@ def _vocabulary_payload(
             {
                 "type": target.model.__name__,
                 "description": target.description,
-                "topology_constraint": target.topology_constraint,
-                "symmetric": target.symmetric,
             }
             for target in relation_targets
         ],
     }
+
+
+def _snake_case(value: str) -> str:
+    return re.sub(r"(?<!^)(?=[A-Z])", "_", value).lower()
 
 
 def _build_prompt(
@@ -264,11 +288,7 @@ The first image is original. The second labels visible scene objects. Ego is the
 Create a short local ID for each lane. Use those local IDs in lane relations.
 Include ego's lane and lanes relevant to ego's immediate driving situation.
 An unoccupied lane can have an empty occupants list.
-Use LeftAdjacentTo for parallel lanes with no physical separator between them.
-Painted lane lines and painted centerlines do not block adjacency.
-Medians, barriers, curbs, grass strips, and substantial unpaved gaps block adjacency.
-Opposing lanes can be adjacent when only paint separates them.
-Use Overlaps for crossing traffic paths. Emit each overlap pair once.
+Use relation descriptions from the schema vocabulary.
 Use only registry IDs as occupants. Return only clear facts.
 
 Scene-object registry:
@@ -283,7 +303,7 @@ def _validate_proposals(
     proposals: RoadLayoutResponse,
     *,
     known_occupants: set[str],
-    target_by_name: dict[str, RoadLayoutTarget],
+    target_by_name: dict[str, ObjectTarget],
     relation_by_name: dict[str, RelationTarget],
 ) -> None:
     proposal_by_local_id: dict[str, RoadObjectProposal] = {}
@@ -364,7 +384,7 @@ def _validate_proposals(
             if symmetric_key in symmetric_keys:
                 raise ValueError(f"Duplicate symmetric lane relation: {symmetric_key}")
             symmetric_keys.add(symmetric_key)
-        if target.topology_constraint == "parallel_without_physical_separator":
+        if target.model is LeftAdjacentTo:
             subject_direction = subject.attributes.get("direction")
             object_direction = object_.attributes.get("direction")
             if (
@@ -389,7 +409,7 @@ def _validate_proposals(
 
 
 def _response_schema(
-    object_targets: tuple[RoadLayoutTarget, ...],
+    object_targets: tuple[ObjectTarget, ...],
     relation_targets: tuple[RelationTarget, ...],
 ) -> dict[str, JsonValue]:
     object_variants: list[dict[str, Any]] = []

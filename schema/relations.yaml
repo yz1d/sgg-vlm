@@ -53,28 +53,24 @@ classes:
     description: The subject is longitudinally ahead of ego in road coordinates, regardless of the subject's facing or motion direction.
     is_a: SpatialRelation
     annotations:
-      relation_extraction: enabled
       exclusive_group: longitudinal
 
   Behind:
     description: The subject is longitudinally behind ego in road coordinates, regardless of the subject's facing or motion direction.
     is_a: SpatialRelation
     annotations:
-      relation_extraction: enabled
       exclusive_group: longitudinal
 
   LeftOf:
     description: The subject is laterally left of ego relative to ego's road heading, not merely in the left half of the image.
     is_a: SpatialRelation
     annotations:
-      relation_extraction: enabled
       exclusive_group: lateral
 
   RightOf:
     description: The subject is laterally right of ego relative to ego's road heading, not merely in the right half of the image.
     is_a: SpatialRelation
     annotations:
-      relation_extraction: enabled
       exclusive_group: lateral
 
   RoadObjectRelation:
@@ -117,13 +113,9 @@ classes:
   LeftAdjacentTo:
     description: The subject is directly left of the object in ego-oriented road coordinates, with no physical separator between them.
     is_a: LaneRelation
-    annotations:
-      road_layout_extraction: enabled
-      topology_constraint: parallel_without_physical_separator
 
   Overlaps:
     description: The subject and object lanes have overlapping traffic paths.
     is_a: LaneRelation
     annotations:
-      road_layout_extraction: enabled
       symmetric: enabled

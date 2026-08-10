@@ -1,14 +1,14 @@
 from __future__ import annotations
 
-from collections.abc import Mapping
 import json
+from collections.abc import Mapping
 from typing import Any, cast
 
 from pydantic import BaseModel, ConfigDict
 
 from src.clients.vlm import VlmClient, VlmRequest
 from src.frame import Frame
-from src.graph._generated.catalog import OBJECT_ATTRIBUTE_TARGETS, RELATION_TARGETS
+from src.graph._generated.catalog import OBJECT_TARGETS, RELATION_TARGETS
 from src.graph._generated.models import (
     EgoVehicle,
     ObjectDecision,
@@ -16,6 +16,7 @@ from src.graph._generated.models import (
     Provenance,
     Relation,
     SceneObject,
+    SpatialRelation,
 )
 from src.graph.ontology import ObjectAttributeTarget, RelationTarget
 from src.stage import StageOutput
@@ -77,12 +78,16 @@ class RelationExtractionStage:
         relation_vocabulary = tuple(
             target
             for target in RELATION_TARGETS
-            if target.relation_extraction
+            if issubclass(target.model, SpatialRelation)
         )
         attribute_vocabulary = tuple(
-            target
-            for target in OBJECT_ATTRIBUTE_TARGETS
-            if any(isinstance(object_, target.object_model) for object_ in objects)
+            attribute
+            for target in OBJECT_TARGETS
+            for attribute in target.attributes
+            if any(
+                isinstance(object_, attribute.object_model)
+                for object_ in objects
+            )
         )
         identity_map = render_identity_map(frame)
         registry: list[JsonValue] = [
@@ -227,7 +232,6 @@ def _vocabulary_payload(
                 "description": target.description,
                 "subject_type": target.subject_model.__name__,
                 "object_type": target.object_model.__name__,
-                "exclusive_group": target.exclusive_group,
             }
             for target in relations
         ],
@@ -240,7 +244,6 @@ def _vocabulary_payload(
                     {
                         "value": value.value,
                         "description": value.description,
-                        "visual_prompt": value.prompt,
                     }
                     for value in target.values
                 ],
