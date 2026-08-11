@@ -1,350 +1,404 @@
 # sgg-vlm
 
-`sgg-vlm` generates a normalized scene graph from one forward-facing driving-camera frame. It currently:
+`sgg-vlm` generates a normalized scene graph from one front-camera image.
 
-1. loads a frame from a video or an Argoverse 2 (AV2) Sensor log;
-2. detects schema-defined road users with Grounding DINO 1.6 Pro;
-3. asks a configurable vision-language model (VLM) to extract ego-relative spatial relationships and object states; and
-4. validates and publishes the graph together with stage-by-stage audit artifacts.
+The application accepts a video frame, an Argoverse 2 Sensor frame, or a CODA image. It processes one frame per run.
 
-The pipeline is intentionally single-frame. It does not perform temporal scene-graph generation; the schema only leaves room for an optional cross-frame `track_id` association.
+The pipeline does not infer across time. The schema reserves `track_id` for an external cross-frame association.
+
+## Pipeline
+
+The pipeline runs five steps in this order:
+
+1. **Input** selects one image and creates a valid scene with the reserved `ego` object.
+2. **Object detection** uses a VLM to detect typed objects, pixel boxes, and visible attributes.
+3. **Road layout extraction** adds lanes, lane membership, and local lane topology.
+4. **Relation extraction** adds longitudinal and lateral relations from visible objects to `ego`.
+5. **Weather extraction** sets one visible atmospheric condition or leaves it unset.
+
+Each VLM stage uses a strict JSON response schema. Pydantic and graph validation reject invalid results before stage publication.
+
+A stage writes its output through a temporary directory. A failed stage does not publish a partial stage directory.
+
+```mermaid
+flowchart TD
+    A[Video, AV2, or CODA] --> B[Input image and empty scene]
+    B --> C[VLM object detection]
+    C --> D[Objects, boxes, and attributes]
+    D --> E[VLM road layout extraction]
+    E --> F[Lanes, membership, and topology]
+    F --> G[VLM relation extraction]
+    G --> H[Object-to-ego spatial relations]
+    H --> I[VLM weather extraction]
+    I --> J[Validated scene graph]
+    S[LinkML schema] --> C
+    S --> E
+    S --> G
+    S --> I
+```
 
 ## Requirements
 
 - Python 3.12 or newer
 - [uv](https://docs.astral.sh/uv/)
-- [Graphviz](https://graphviz.org/) with the `dot` executable on `PATH`
-- Network access and credentials for:
-  - DeepDataSpace Grounding DINO object detection
-  - one VLM platform configured in `models.yaml`
+- Network access for VLM requests and dataset downloads
+- `jj` for the revision in each run name, or `git` as a fallback
+- A credential for each platform selected in `models.yaml`
 
-Install the Python environment from the lockfile:
+[Graphviz](https://graphviz.org/) is optional. If `dot` is unavailable, the pipeline omits `graph.png` and continues.
+
+## Setup
+
+Install the locked Python environment:
 
 ```bash
 uv sync
 ```
 
-## Configuration
-
-The application loads credentials from the environment and from a repository-root `.env` file.
-
-Object detection always requires:
+Create a repository-root `.env` file with the credential for the current configuration:
 
 ```dotenv
-DEEPDATASPACE_TOKEN=...
+DASHSCOPE_API_KEY=...
 ```
 
-Relation extraction defaults to the `gemini` platform in `models.yaml`, so the default setup also requires:
+Add this credential if any stage uses Gemini:
 
 ```dotenv
 GEMINI_API_KEY=...
 ```
 
-The configured alternatives use these credentials:
+Only configured platforms require credentials. The current configuration uses Qwen for all stages.
 
-| Platform | Credential | Optional API-base override |
-| --- | --- | --- |
-| `gemini` | `GEMINI_API_KEY` | — |
-| `qwen` | `DASHSCOPE_API_KEY` | `DASHSCOPE_API_BASE` |
-| `kimi` | `MOONSHOT_API_KEY` | `MOONSHOT_API_BASE` |
-| `glm` | `ZAI_API_KEY` | `ZAI_API_BASE` |
+## Configuration
 
-`models.yaml` controls the default platform, provider model identifiers, timeouts, API bases, and provider-specific LiteLLM parameters. Select another configured platform per invocation with `--relation-platform`:
+`models.yaml` defines shared request limits, stage platforms, model identifiers, API bases, parameters, and model reasoning controls.
 
-```bash
-uv run python -m src.main video DASH_1080.mp4 \
-  --timestamp 52 \
-  --relation-platform qwen
-```
+The supported platforms are:
 
-A different model configuration file can be supplied with `--model-config PATH`.
+| Platform | Model | LiteLLM provider | Credential |
+| --- | --- | --- | --- |
+| `qwen` | `dashscope/qwen3.8-max` | `dashscope` | `DASHSCOPE_API_KEY` |
+| `gemini` | `gemini/gemini-3.5-flash` | `gemini` | `GEMINI_API_KEY` |
+
+Each stage has an independent platform and `reasoning` configuration. The current stage configuration is:
+
+| Stage | Platform | Reasoning mode | Effort |
+| --- | --- | --- | --- |
+| `detection` | `qwen` | `disabled` | — |
+| `road_layout` | `qwen` | `enabled` | `low` |
+| `relations` | `qwen` | `enabled` | `low` |
+| `weather` | `qwen` | `disabled` | — |
+
+The shared timeout is 120 seconds. The shared output limit is 8192 tokens.
+
+`configs.yaml` defines pipeline behavior outside model transport. It sets `object_detection.min_object_area_ratio` to `0.0003`.
+
+The detector drops a box when its clipped pixel area is below this image-area ratio.
 
 ## Usage
 
-Run `just` to list the common commands. All paths below are relative to the repository root.
+List the repository commands:
 
-### Process a video frame
+```bash
+just
+```
 
-Place a video in `inputs/videos/`. The CLI accepts a base filename, not an absolute or nested path. `--timestamp` is a non-negative presentation time in seconds; the first frame at or after that time is selected.
+### Video
+
+Place the video in `inputs/videos/`.
+
+Process the first video frame:
+
+```bash
+just video DASH_1080.mp4
+```
+
+Process the first frame at or after 52 seconds:
 
 ```bash
 just video DASH_1080.mp4 52
 ```
 
-Equivalent direct invocation:
+Use the direct CLI when necessary:
 
 ```bash
 uv run python -m src.main video DASH_1080.mp4 --timestamp 52
 ```
 
-Select the first frame by omitting the timestamp or using `0`:
+The filename must be a base filename. The timestamp must be non-negative.
 
-```bash
-uv run python -m src.main video DASH_1080.mp4
-```
+### Argoverse 2 Sensor
 
-### Process an AV2 front-camera frame
-
-The repository includes a downloader for the front-camera subset of AV2 Sensor logs. List available validation logs and their local status:
+List validation logs and their local status:
 
 ```bash
 just av2-list
 ```
 
-Download a random log or a specific log:
+Download a random validation log:
 
 ```bash
 just av2-download-random
+```
+
+Download a specific log:
+
+```bash
 just av2-download <LOG_ID>
 ```
 
-Use `split=train` for the training split:
+Pass `train` as the final argument to use the training split:
 
 ```bash
 just av2-download <LOG_ID> train
 ```
 
-Generate a graph for a zero-based `ring_front_center` frame index:
+Process a zero-based `ring_front_center` frame index:
 
 ```bash
 just av2 <LOG_ID> 0
 ```
 
-Equivalent direct invocation:
+Use the direct CLI when necessary:
 
 ```bash
 uv run python -m src.main av2 <LOG_ID> --split val --frame 0
 ```
 
-Downloaded data is stored under:
+The downloader stores front-camera images and required metadata under this path:
 
 ```text
 inputs/av2/sensor/<split>/<log-id>/
 ```
 
-Only `ring_front_center` images and the small set of required AV2 metadata files are downloaded.
+### CODA
 
-### Choose an output directory
-
-Without `--output`, each run receives a UTC timestamp directory under `outputs/`. A custom output root can be supplied to either input command:
+Download the official sample subset:
 
 ```bash
-uv run python -m src.main video DASH_1080.mp4 \
-  --timestamp 52 \
-  --output outputs/my-run
+just coda-download-sample
 ```
 
-Use a fresh output location. The pipeline refuses to overwrite an existing numbered stage directory.
+Download the CODA2022 validation subset:
+
+```bash
+just coda-download-val
+```
+
+Process an image by its annotation ID:
+
+```bash
+just coda <IMAGE_ID> sample
+just coda <IMAGE_ID> val
+```
+
+Use the direct CLI when necessary:
+
+```bash
+uv run python -m src.main coda <IMAGE_ID> --subset val
+```
+
+The downloader stores each subset under `inputs/coda/<subset>/`.
+
+### Output archive
+
+Move all run directories into `outputs/_archives/`:
+
+```bash
+just archive
+```
 
 ## Outputs
 
-A successful run has this general layout:
+Each run uses this directory name:
 
 ```text
-outputs/<run-timestamp>/
+outputs/<unix-seconds>-<revision>-<source>-<platforms>/
+```
+
+`<platforms>` lists the distinct stage platforms in stage order. A run that uses only Qwen ends with `-qwen`.
+
+A complete run has this structure:
+
+```text
+outputs/<run>/
 └── frame_000001/
     ├── 01-input/
     │   ├── graph.json
     │   ├── graph.png
-    │   ├── image.png            # extension may match the source image
+    │   ├── image.<image-extension>
     │   └── source.json
     ├── 02-object-detection/
     │   ├── graph.json
     │   ├── graph.png
+    │   ├── prompt.txt
+    │   ├── stage-input.json
     │   ├── request.json
     │   ├── response.raw.json
+    │   ├── response.txt
     │   ├── detections.json
+    │   ├── filtered-detections.json
     │   └── overlay.png
-    ├── 03-relation-extraction/
+    ├── 03-road-layout-extraction/
     │   ├── graph.json
     │   ├── graph.png
-    │   ├── stage-input.json
     │   ├── prompt.txt
+    │   ├── stage-input.json
     │   ├── request.json
     │   ├── response.raw.json
     │   ├── response.txt
     │   ├── identity-map.png
-    │   ├── relationships.json
-    │   └── states.json
-    └── graph.json               # final normalized scene graph
+    │   ├── lanes.json
+    │   └── relations.json
+    ├── 04-relation-extraction/
+    │   ├── graph.json
+    │   ├── graph.png
+    │   ├── prompt.txt
+    │   ├── stage-input.json
+    │   ├── request.json
+    │   ├── response.raw.json
+    │   ├── response.txt
+    │   ├── identity-map.png
+    │   └── relations.json
+    ├── 05-weather-extraction/
+    │   ├── graph.json
+    │   ├── graph.png
+    │   ├── prompt.txt
+    │   ├── stage-input.json
+    │   ├── request.json
+    │   ├── response.raw.json
+    │   ├── response.txt
+    │   └── weather.json
+    └── graph.json
 ```
 
-Every numbered directory is a snapshot after that stage. `graph.json` is the normalized semantic result, while the other files are non-semantic traces for inspection and debugging. `graph.png` is a Graphviz rendering of the corresponding snapshot.
+Every numbered directory contains the validated graph after that stage. The root `graph.json` is the final semantic result.
 
-If object detection finds no road users, relation extraction is skipped and records that decision in `request.json`; no VLM request is made.
+Trace files preserve prompts, request manifests, raw responses, normalized proposals, and image overlays. Request manifests contain image hashes instead of image data.
 
-## Data flow
-
-```mermaid
-flowchart TD
-    A[Video or AV2 Sensor log] --> B[InputSource]
-    B --> C[Selected front-camera image]
-    B --> D[Valid empty Scene with ego]
-    C --> E[Grounding DINO object detection]
-    S[LinkML schema] -->|detection prompts and road-user classes| E
-    E --> F[AddRoadUser changes]
-    D --> G[Graph change applier]
-    F --> G
-    G --> H[Graph validation]
-    H --> I[Scene with typed road users and bounding boxes]
-    I --> J[Identity-map overlay plus original image]
-    S -->|relationship/state vocabulary| K[VLM relation extraction]
-    J --> K
-    K --> L[Validated relationship and state proposals]
-    L --> M[AddRelationship / AddObjectState changes]
-    I --> N[Graph change applier]
-    M --> N
-    N --> O[Graph validation]
-    O --> P[Final scene graph]
-    P --> Q[graph.json and Graphviz PNG]
-
-    B -. source trace .-> R[Stage artifact store]
-    E -. requests, raw response, detections, overlay .-> R
-    K -. prompt, request, raw response, normalized output .-> R
-```
-
-### Stage behavior
-
-1. **Input**
-   - `VideoSource` decodes the first video frame at or after the requested presentation timestamp.
-   - `Av2Source` selects a zero-based frame from `ring_front_center`, sorted by timestamp filename.
-   - The source creates an empty, valid `Scene` containing the reserved `ego` node and source provenance.
-
-2. **Object detection**
-   - Detectable classes and text prompts are discovered from LinkML annotations rather than duplicated in stage code.
-   - The current prompts cover cars, trucks, buses, school buses, motorcycles, cyclists, and pedestrians.
-   - Grounding DINO returns pixel-space XYXY boxes and source confidence values.
-   - Results become controlled `AddRoadUser` changes with stable frame-local IDs such as `road_user_001`.
-
-3. **Relation extraction**
-   - The stage sends the VLM both the original frame and an identity-map image containing road-user IDs and boxes.
-   - The prompt vocabulary is derived from the schema.
-   - The current extractable relationships are `InFrontOf`, `Behind`, `LeftOf`, and `RightOf`. Longitudinal and lateral alternatives are mutually exclusive per road user.
-   - The current object state is `StopArmState` (`deployed` or `stowed`), applicable only to `SchoolBus`.
-   - Unknown IDs or types, duplicate proposals, conflicting relationships, and invalid state values are rejected before graph mutation.
-
-4. **Apply, validate, and publish**
-   - Stages return semantic changes instead of mutating a `Scene` directly.
-   - The pipeline applies changes to a deep copy, validates the complete graph, and then atomically publishes the stage directory.
-   - A failed stage is logged and does not publish a partial stage directory.
+If no visible object exists, relation extraction records a skipped request and returns no object-to-ego relations.
 
 ## Scene graph model
 
-The authoritative graph definition is the LinkML schema under `schema/`. The runtime representation is the generated Pydantic model in `src/graph/models.py`.
+The LinkML files under `schema/` define the graph. Generated Pydantic models and extraction catalogs reside under `src/graph/_generated/`.
 
-A final `Scene` contains:
+A `Scene` contains:
 
-- `frame_id` and optional source `timestamp_ns`;
-- scene-level provenance;
-- one reserved `EgoVehicle` with ID `ego`;
-- detected `road_users`, each with a concrete type, pixel bounding box, optional `track_id`, and provenance;
-- optional object `states` referencing road-user IDs; and
-- optional spatial `relationships` from a road user to `ego`.
+- one frame identifier and an optional source timestamp
+- scene provenance
+- zero or one weather value
+- a typed object list with exactly one `EgoVehicle` named `ego`
+- a typed relation list
 
-Important invariants include:
+Visible objects use pixel-space XYXY boxes. Objects can contain source provenance, an optional `track_id`, and schema-defined attributes.
 
-- road-user and relationship IDs are unique;
-- `ego` cannot be used as a perceived road-user ID;
-- bounding boxes have ordered, non-negative coordinates;
-- state subjects exist and have a compatible road-user type;
-- relationship subjects exist and every relationship targets `ego`; and
-- each road user has at most one relationship in each schema-defined exclusive group.
+### Object vocabulary
 
-## Software architecture
+Object detection currently supports:
 
-```mermaid
-flowchart LR
-    CLI[src/main.py\nCLI and composition root]
-    CFG[src/config.py\nmodel configuration]
-    PIPE[src/pipeline.py\norchestration and publishing]
-    INPUT[src/inputs/\nvideo and AV2 adapters]
-    STAGES[src/stages/\ngraph enrichment]
-    CLIENTS[src/clients/\nprovider adapters]
-    GRAPH[src/graph/\ndomain model, changes, validation]
-    SCHEMA[schema/\nLinkML source of truth]
-    TRACE[src/traces.py\naudit artifact publishing]
-    OVERLAY[src/overlay.py\nimage annotations]
+- `Car`
+- `Truck`
+- `Bus`
+- `SchoolBus`
+- `Motorcycle`
+- `Cyclist`
+- `Pedestrian`
+- `ConstructionWorker`
+- `PoliceOfficer`
+- `RoadBlockage`
 
-    CLI --> CFG
-    CLI --> PIPE
-    CLI --> INPUT
-    CLI --> STAGES
-    STAGES --> CLIENTS
-    STAGES --> GRAPH
-    STAGES --> OVERLAY
-    PIPE --> INPUT
-    PIPE --> GRAPH
-    PIPE --> TRACE
-    GRAPH --> SCHEMA
+Vehicle types can contain `opening_state` with `open` or `closed`. `SchoolBus` can also contain `stop_arm_position` with `deployed` or `stowed`.
+
+Road layout extraction adds `Lane` objects. Each lane has `direction` set to `same_as_ego`, `opposite_to_ego`, or `crossing`.
+
+### Relation vocabulary
+
+The graph supports these relation groups:
+
+| Group | Relations |
+| --- | --- |
+| Object to ego | `InFrontOf`, `Behind`, `LeftOf`, `RightOf` |
+| Object to lane | `InLane` |
+| Lane topology | `LeftAdjacentTo`, `Overlaps` |
+
+`InFrontOf` and `Behind` are mutually exclusive per subject. `LeftOf` and `RightOf` are also mutually exclusive per subject.
+
+Each subject can occupy at most one lane. `Overlaps` uses a canonical endpoint order because it is symmetric.
+
+### Weather vocabulary
+
+The weather value is one of:
+
+- `clear`
+- `cloudy`
+- `rainy`
+- `snowy`
+- `foggy`
+
+The value remains absent when the image provides no clear evidence.
+
+### Graph validation
+
+Graph validation enforces these cross-record rules:
+
+- Object and relation IDs are unique.
+- Exactly one `EgoVehicle` uses the `ego` ID.
+- The `ego` object has no image box.
+- Every relation endpoint exists and has the required type.
+- Duplicate and conflicting relations are invalid.
+- Lane adjacency excludes crossing lanes and repeated direct neighbors.
+- Symmetric lane relations use canonical endpoint order.
+
+## Schema compilation
+
+Do not edit files under `src/graph/_generated/` directly.
+
+Edit the LinkML files under `schema/`.
+
+Compile the schema after each schema change:
+
+```bash
+just schema
 ```
 
-The main boundaries are expressed as small protocols:
+The compiler writes these generated files:
 
-- `InputSource` loads one source-independent `Frame`.
-- `ObjectDetectionClient` isolates detector providers.
-- `VlmClient` isolates multimodal model providers.
-- `Stage` enriches a graph by returning allowed `SceneChange` values and `Trace` artifacts.
-- `GraphChangeApplier` owns semantic graph mutation.
-- `GraphValidator` owns cross-object domain invariants.
-- `TraceStore` owns materialization of non-semantic audit files.
+- `src/graph/_generated/models.py`
+- `src/graph/_generated/catalog.py`
 
-This separation keeps provider transport details out of the graph domain and allows stages or clients to be replaced without changing pipeline orchestration.
+The catalog supplies concrete object types, enum attributes, relation types, exclusive groups, and symmetric relation metadata to the stages.
 
-## Repository structure
+## Software structure
 
 ```text
 .
-├── justfile                    # common data and inference commands
-├── models.yaml                 # relation-extraction provider/model settings
-├── pyproject.toml              # Python package metadata and dependencies
-├── uv.lock                     # reproducible dependency lockfile
+├── configs.yaml                 # Pipeline behavior configuration
+├── models.yaml                  # VLM platform and stage configuration
+├── justfile                     # Common commands
+├── pyproject.toml               # Python metadata and dependencies
+├── uv.lock                      # Locked Python environment
 ├── schema/
-│   ├── scene_graph.yaml        # root LinkML Scene schema
-│   ├── common.yaml             # geometry and provenance
-│   ├── road_users.yaml         # road-user hierarchy and detection prompts
-│   ├── relationships.yaml      # ego-relative spatial relationships
-│   └── states.yaml             # object states and extraction vocabulary
+│   ├── scene_graph.yaml         # Root Scene schema
+│   ├── common.yaml              # Geometry and provenance
+│   ├── objects.yaml             # Object hierarchy and attributes
+│   ├── relations.yaml           # Spatial and lane relations
+│   └── weather.yaml             # Weather vocabulary
 ├── scripts/
-│   └── av2_downloader.py       # focused AV2 front-camera downloader
-├── src/
-│   ├── main.py                 # CLI and dependency composition
-│   ├── config.py               # models.yaml parsing and validation
-│   ├── frame.py                # image plus current Scene
-│   ├── pipeline.py             # ordered execution and atomic stage output
-│   ├── stage.py                # Stage protocol and StageOutput
-│   ├── traces.py               # trace values and filesystem store
-│   ├── overlay.py              # labeled bounding-box rendering
-│   ├── inputs/                 # VideoSource and Av2Source
-│   ├── clients/                # Grounding DINO and LiteLLM adapters
-│   ├── stages/                 # object detection and relation extraction
-│   └── graph/                  # models, schema discovery, changes, validation,
-│                              # extraction metadata, and Graphviz rendering
-├── inputs/                     # local videos and downloaded AV2 subsets
-└── outputs/                    # timestamped inference results and traces
+│   ├── av2_downloader.py        # AV2 front-camera downloader
+│   ├── coda_downloader.py       # CODA subset downloader
+│   └── compile_schema.py        # LinkML compiler
+└── src/
+    ├── main.py                  # CLI and dependency composition
+    ├── config.py                # YAML configuration validation
+    ├── pipeline.py              # Stage order and atomic output publication
+    ├── stage.py                 # Stage protocol and graph upserts
+    ├── traces.py                # Trace values and publication
+    ├── clients/                 # VLM protocol and LiteLLM adapter
+    ├── inputs/                  # Video, AV2, and CODA sources
+    ├── stages/                  # Four graph enrichment stages
+    └── graph/                   # Generated models, validation, and Graphviz output
 ```
 
-## Extending the pipeline
+`InputSource` converts each supported source into one `Frame`. `Stage` returns object, relation, weather, and trace values through `StageOutput`.
 
-The schema is the vocabulary source of truth:
-
-- a concrete `PerceivedRoadUser` with an `object_detection_prompt` annotation becomes an object-detection target;
-- a concrete `SpatialRelationship` with `relation_extraction: enabled` becomes part of the VLM relationship vocabulary;
-- concrete `ObjectState` classes and their enums define applicable state proposals and accepted values.
-
-After changing the LinkML source, regenerate `src/graph/models.py` before running the application:
-
-```bash
-uv run gen-pydantic schema/scene_graph.yaml > /tmp/sgg-vlm-models.py \
-  && mv /tmp/sgg-vlm-models.py src/graph/models.py
-```
-
-Keep domain validation in `src/graph/validation.py` for constraints that cannot be represented completely in LinkML.
-
-A new enrichment stage should:
-
-1. implement the `Stage` protocol;
-2. declare a lowercase hyphenated `name` and its `allowed_changes`;
-3. return controlled semantic changes plus optional traces; and
-4. be added to the ordered stage tuple in `src/main.py`.
-
-The pipeline will then apply its changes, validate the resulting graph, render it, and publish a numbered stage snapshot.
+`Pipeline` applies each stage result to a new scene and validates the complete graph. `LiteLlmClient` isolates model transport from graph logic.
