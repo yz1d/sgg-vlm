@@ -138,6 +138,24 @@ class VehicleOpeningState(str, Enum):
     """
 
 
+class VehicleBodyOrientation(str, Enum):
+    """
+    Visible roll orientation of a vehicle body relative to its normal driving orientation.
+    """
+    upright = "upright"
+    """
+    The vehicle body has its normal upright roll orientation.
+    """
+    on_side = "on_side"
+    """
+    The vehicle body lies on either side.
+    """
+    upside_down = "upside_down"
+    """
+    The vehicle body is inverted from its normal upright orientation.
+    """
+
+
 class LaneDirection(str, Enum):
     """
     Traffic direction in a lane relative to ego's direction.
@@ -240,6 +258,7 @@ class Vehicle(PotentiallyMovingObject):
     A motorized vehicle represented in the traffic scene.
     """
     opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
+    body_orientation: Optional[VehicleBodyOrientation] = Field(default=None, description="""Visible roll orientation of the vehicle body relative to its normal driving orientation.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Vehicle"] = Field(default="Vehicle", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -252,6 +271,7 @@ class Car(Vehicle):
     A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.
     """
     opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
+    body_orientation: Optional[VehicleBodyOrientation] = Field(default=None, description="""Visible roll orientation of the vehicle body relative to its normal driving orientation.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Car"] = Field(default="Car", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -264,6 +284,7 @@ class Truck(Vehicle):
     A motorized vehicle designed primarily to transport cargo.
     """
     opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
+    body_orientation: Optional[VehicleBodyOrientation] = Field(default=None, description="""Visible roll orientation of the vehicle body relative to its normal driving orientation.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Truck"] = Field(default="Truck", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -276,6 +297,7 @@ class Bus(Vehicle):
     A motorized vehicle designed to carry multiple passengers.
     """
     opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
+    body_orientation: Optional[VehicleBodyOrientation] = Field(default=None, description="""Visible roll orientation of the vehicle body relative to its normal driving orientation.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Bus"] = Field(default="Bus", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -289,6 +311,7 @@ class SchoolBus(Bus):
     """
     stop_arm_position: Optional[StopArmPosition] = Field(default=None, description="""Visible position of the school bus stop arm.""")
     opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
+    body_orientation: Optional[VehicleBodyOrientation] = Field(default=None, description="""Visible roll orientation of the vehicle body relative to its normal driving orientation.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["SchoolBus"] = Field(default="SchoolBus", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
@@ -301,6 +324,7 @@ class Motorcycle(Vehicle):
     A motorized vehicle designed primarily for passenger transportation on two or three wheels.
     """
     opening_state: Optional[VehicleOpeningState] = Field(default=None, description="""Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.""")
+    body_orientation: Optional[VehicleBodyOrientation] = Field(default=None, description="""Visible roll orientation of the vehicle body relative to its normal driving orientation.""")
     id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
     type: Literal["Motorcycle"] = Field(default="Motorcycle", description="""Concrete LinkML class of this object.""")
     bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")

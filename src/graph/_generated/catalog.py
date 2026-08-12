@@ -59,6 +59,26 @@ OBJECT_TARGETS = (
                     ),
                 ),
             ),
+            ObjectAttributeTarget(
+                object_model=Bus,
+                name='body_orientation',
+                description='Visible roll orientation of the vehicle body relative to its normal driving orientation.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='upright',
+                        description='The vehicle body has its normal upright roll orientation.',
+                    ),
+                    AttributeValue(
+                        value='on_side',
+                        description='The vehicle body lies on either side.',
+                    ),
+                    AttributeValue(
+                        value='upside_down',
+                        description='The vehicle body is inverted from its normal upright orientation.',
+                    ),
+                ),
+            ),
         ),
     ),
     ObjectTarget(
@@ -78,6 +98,26 @@ OBJECT_TARGETS = (
                     AttributeValue(
                         value='closed',
                         description='All applicable visible vehicle openings appear closed.',
+                    ),
+                ),
+            ),
+            ObjectAttributeTarget(
+                object_model=Car,
+                name='body_orientation',
+                description='Visible roll orientation of the vehicle body relative to its normal driving orientation.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='upright',
+                        description='The vehicle body has its normal upright roll orientation.',
+                    ),
+                    AttributeValue(
+                        value='on_side',
+                        description='The vehicle body lies on either side.',
+                    ),
+                    AttributeValue(
+                        value='upside_down',
+                        description='The vehicle body is inverted from its normal upright orientation.',
                     ),
                 ),
             ),
@@ -147,6 +187,26 @@ OBJECT_TARGETS = (
                     ),
                 ),
             ),
+            ObjectAttributeTarget(
+                object_model=Motorcycle,
+                name='body_orientation',
+                description='Visible roll orientation of the vehicle body relative to its normal driving orientation.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='upright',
+                        description='The vehicle body has its normal upright roll orientation.',
+                    ),
+                    AttributeValue(
+                        value='on_side',
+                        description='The vehicle body lies on either side.',
+                    ),
+                    AttributeValue(
+                        value='upside_down',
+                        description='The vehicle body is inverted from its normal upright orientation.',
+                    ),
+                ),
+            ),
         ),
     ),
     ObjectTarget(
@@ -197,6 +257,26 @@ OBJECT_TARGETS = (
                     ),
                 ),
             ),
+            ObjectAttributeTarget(
+                object_model=SchoolBus,
+                name='body_orientation',
+                description='Visible roll orientation of the vehicle body relative to its normal driving orientation.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='upright',
+                        description='The vehicle body has its normal upright roll orientation.',
+                    ),
+                    AttributeValue(
+                        value='on_side',
+                        description='The vehicle body lies on either side.',
+                    ),
+                    AttributeValue(
+                        value='upside_down',
+                        description='The vehicle body is inverted from its normal upright orientation.',
+                    ),
+                ),
+            ),
         ),
     ),
     ObjectTarget(
@@ -216,6 +296,26 @@ OBJECT_TARGETS = (
                     AttributeValue(
                         value='closed',
                         description='All applicable visible vehicle openings appear closed.',
+                    ),
+                ),
+            ),
+            ObjectAttributeTarget(
+                object_model=Truck,
+                name='body_orientation',
+                description='Visible roll orientation of the vehicle body relative to its normal driving orientation.',
+                required=False,
+                values=(
+                    AttributeValue(
+                        value='upright',
+                        description='The vehicle body has its normal upright roll orientation.',
+                    ),
+                    AttributeValue(
+                        value='on_side',
+                        description='The vehicle body lies on either side.',
+                    ),
+                    AttributeValue(
+                        value='upside_down',
+                        description='The vehicle body is inverted from its normal upright orientation.',
                     ),
                 ),
             ),
