@@ -8,7 +8,7 @@ from pathlib import Path
 
 from src.clients import LiteLlmClient
 from src.config import load_app_config, load_model_config
-from src.inputs import Av2Source, CodaSource, VideoSource
+from src.inputs import Av2Source, CodaSource, ImageSource, VideoSource
 from src.pipeline import Pipeline
 from src.stages import (
     ObjectDetectionStage,
@@ -21,6 +21,7 @@ REPOSITORY_ROOT = Path(__file__).resolve().parents[1]
 AV2_ROOT = REPOSITORY_ROOT / "inputs/av2/sensor"
 CODA_ROOT = REPOSITORY_ROOT / "inputs/coda"
 VIDEO_ROOT = REPOSITORY_ROOT / "inputs/videos"
+IMAGE_ROOT = REPOSITORY_ROOT / "inputs/images"
 OUTPUT_ROOT = REPOSITORY_ROOT / "outputs"
 APP_CONFIG = REPOSITORY_ROOT / "configs.yaml"
 MODEL_CONFIG = REPOSITORY_ROOT / "models.yaml"
@@ -35,6 +36,11 @@ def main() -> int:
     )
     video.add_argument("filename", type=_base_filename)
     video.add_argument("--timestamp", type=float, default=0.0)
+
+    image = subparsers.add_parser(
+        "image", help="Load one frame from a path in inputs/images"
+    )
+    image.add_argument("path", type=_relative_path)
 
     av2 = subparsers.add_parser(
         "av2", help="Load one ring_front_center frame from an AV2 Sensor log"
@@ -56,6 +62,8 @@ def main() -> int:
                 VIDEO_ROOT / arguments.filename,
                 timestamp_seconds=arguments.timestamp,
             )
+        elif arguments.source == "image":
+            source = ImageSource(IMAGE_ROOT / arguments.path)
         elif arguments.source == "av2":
             source = Av2Source(
                 AV2_ROOT / arguments.split / arguments.log_id,
@@ -131,6 +139,13 @@ def _base_filename(value: str) -> str:
     if path.is_absolute() or path.name != value or value in {"", ".", ".."}:
         raise argparse.ArgumentTypeError("video must be a base filename")
     return value
+
+
+def _relative_path(value: str) -> Path:
+    path = Path(value)
+    if path.is_absolute() or not path.parts or ".." in path.parts or path == Path("."):
+        raise argparse.ArgumentTypeError("image path must be relative to inputs/images")
+    return path
 
 
 def _new_run_directory(*, source: str, vlm: str) -> Path:
