@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 from src.graph._generated.models import (
+    Animal,
     Behind,
     Bus,
     Car,
@@ -33,6 +34,12 @@ from src.graph.ontology import (
 )
 
 OBJECT_TARGETS = (
+    ObjectTarget(
+        model=Animal,
+        description='A visible non-human animal that can affect traffic, including wild animals, domestic animals and livestock.',
+        attributes=(
+        ),
+    ),
     ObjectTarget(
         model=Bus,
         description='A motorized vehicle designed to carry multiple passengers.',
