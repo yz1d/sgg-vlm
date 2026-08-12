@@ -100,6 +100,10 @@ classes:
     description: A motorized vehicle designed primarily for passenger transportation on two or three wheels.
     is_a: Vehicle
 
+  Animal:
+    description: A visible non-human animal that can affect traffic, including wild animals, domestic animals and livestock.
+    is_a: PotentiallyMovingObject
+
   Cyclist:
     description: A person riding a bicycle.
     is_a: PotentiallyMovingObject
