@@ -125,13 +125,6 @@ classes:
     is_a: SceneObject
     abstract: true
 
-  RoadBlockage:
-    description: A contiguous visible road area unavailable for normal vehicle travel.
-    is_a: RoadObject
-    slot_usage:
-      bbox:
-        required: true
-
   Lane:
     description: A semantic traffic lane relevant to ego's immediate driving situation.
     is_a: RoadObject
