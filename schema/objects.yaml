@@ -75,6 +75,9 @@ classes:
       opening_state:
         description: Visible state of the vehicle doors, hood, trunk, hatch, tailgate, or cargo doors.
         range: VehicleOpeningState
+      body_orientation:
+        description: Visible roll orientation of the vehicle body relative to its normal driving orientation.
+        range: VehicleBodyOrientation
 
   Car:
     description: A motorized vehicle designed primarily for passenger transportation. A car typically has four wheels.
@@ -161,6 +164,16 @@ enums:
         description: At least one applicable vehicle opening is visibly open.
       closed:
         description: All applicable visible vehicle openings appear closed.
+
+  VehicleBodyOrientation:
+    description: Visible roll orientation of a vehicle body relative to its normal driving orientation.
+    permissible_values:
+      upright:
+        description: The vehicle body has its normal upright roll orientation.
+      on_side:
+        description: The vehicle body lies on either side.
+      upside_down:
+        description: The vehicle body is inverted from its normal upright orientation.
 
   LaneDirection:
     description: Traffic direction in a lane relative to ego's direction.
