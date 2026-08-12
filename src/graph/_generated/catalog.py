@@ -21,7 +21,6 @@ from src.graph._generated.models import (
     Pedestrian,
     PoliceOfficer,
     RightOf,
-    RoadBlockage,
     SceneObject,
     SchoolBus,
     Truck,
@@ -159,12 +158,6 @@ OBJECT_TARGETS = (
     ObjectTarget(
         model=PoliceOfficer,
         description='A visibly identifiable police officer in the traffic scene.',
-        attributes=(
-        ),
-    ),
-    ObjectTarget(
-        model=RoadBlockage,
-        description='A contiguous visible road area unavailable for normal vehicle travel.',
         attributes=(
         ),
     ),

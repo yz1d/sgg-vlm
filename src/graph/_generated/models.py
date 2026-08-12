@@ -374,17 +374,6 @@ class RoadObject(SceneObject):
     provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
 
 
-class RoadBlockage(RoadObject):
-    """
-    A contiguous visible road area unavailable for normal vehicle travel.
-    """
-    id: str = Field(default=..., description="""Identity used to reference this object within the scene.""")
-    type: Literal["RoadBlockage"] = Field(default="RoadBlockage", description="""Concrete LinkML class of this object.""")
-    bbox: BoundingBox2D = Field(default=..., description="""Optional image-space bounding box in pixel XYXY coordinates.""")
-    track_id: Optional[str] = Field(default=None, description="""Optional cross-frame identity for the same physical object.""")
-    provenance: list[ObjectProvenance] = Field(default=..., description="""Sources that support decisions in this object record.""")
-
-
 class Lane(RoadObject):
     """
     A semantic traffic lane relevant to ego's immediate driving situation.
@@ -535,7 +524,7 @@ class Scene(ConfiguredBaseModel):
     timestamp_ns: Optional[int] = Field(default=None, description="""Optional source timestamp in nanoseconds.""", ge=0)
     provenance: list[Provenance] = Field(default=..., description="""Sources that contributed the frame represented by this scene.""")
     weather: Optional[WeatherCondition] = Field(default=None, description="""Visible atmospheric condition for this scene.""")
-    objects: list[Annotated[Union[Animal,Bus,Car,ConstructionWorker,Cyclist,EgoVehicle,Lane,Motorcycle,Pedestrian,PoliceOfficer,RoadBlockage,SchoolBus,Truck], Field(discriminator="type")]] = Field(default=..., description="""Potentially moving, road, and static objects represented in the scene.""")
+    objects: list[Annotated[Union[Animal,Bus,Car,ConstructionWorker,Cyclist,EgoVehicle,Lane,Motorcycle,Pedestrian,PoliceOfficer,SchoolBus,Truck], Field(discriminator="type")]] = Field(default=..., description="""Potentially moving, road, and static objects represented in the scene.""")
     relations: list[Annotated[Union[Behind,InFrontOf,InLane,LeftAdjacentTo,LeftOf,Overlaps,RightOf], Field(discriminator="type")]] = Field(default=..., description="""Relations between objects represented in the scene.""")
 
 
@@ -559,7 +548,6 @@ Pedestrian.model_rebuild()
 ConstructionWorker.model_rebuild()
 PoliceOfficer.model_rebuild()
 RoadObject.model_rebuild()
-RoadBlockage.model_rebuild()
 Lane.model_rebuild()
 StaticObject.model_rebuild()
 Relation.model_rebuild()
