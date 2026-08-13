@@ -37,11 +37,11 @@ If you are familiar with general data schema, some keywords in LinkML can be tho
 
 | LinkML Semantics  | Generic Schema  | Syntax/Keywords | Examples | 
 |-------------------|----------------------|-------|------------- |
-| Classes  |  objects/entities |  `classes` | [line 17, relationships](./relationships.yaml)
-| Slots/Attributes | properties/fields of objects  | `attributes` / `slots` | [line 20, rouad_regions](./road_regions.yaml) 
-| Types  | property types  | `range` | self-defined classes as types, [Provenance in common](./common.yaml) used in [road_regions](./road_regions.yaml) as type at line 33
-| Enums  | categorical values  | `enums` | this enum definiton: [weather](./weather.yaml) is used in [line 40, scene_graph](./scene_graph.yaml)
-| Inheritance  |  relationships btw types of entities  | `is_a` | [line 40, rouad_regions](./road_regions.yaml) 
+| Classes  |  objects/entities |  `classes` | [line 17, relations](./relations.yaml)
+| Slots/Attributes | properties/fields of objects  | `attributes` / `slots` | [line 30, objects](./objects.yaml) 
+| Types  | property types  | `range` | self-defined classes as types, [Provenance in common](./common.yaml)
+| Enums  | categorical values  | `enums` | this enum definiton: [weather](./weather.yaml) is used in [line 145, objects](./objects.yaml)
+| Inheritance  |  relationships btw types of entities  | `is_a` | [line 41, relations](./relations.yaml) 
 
 Note: the `id, name, version, description, imports` are metadata one can attach to a LinkML model
 
@@ -49,19 +49,20 @@ Note: the `id, name, version, description, imports` are metadata one can attach 
 
 ### 2.1 Abstract Classes
 ---
-Notice in [road_region](./road_regions.yaml), the class `RoadRegion` is an abstract class
+Notice in [relations](./relations.yaml), the class `Relation` is an abstract class
 ```yaml
-RoadRegion:
-    description: An image-derived road surface region represented in the scene graph.
+Relation:
+    description: An abstract relation between two objects in the scene graph.
     abstract: true
     attributes:
 ```
-Similar to abstract classes in Java, they are meant to capture common properties of their subclasses, and not intended to be instantiated directly. Its subclasses are `Lane` and `Intersection`
+Similar to abstract classes in Java, they are meant to capture common properties of their subclasses, and not intended to be instantiated directly. Example subclasses: `SpatialRelation` and `RoadObjectRelation`
 ```yaml
-Lane:
-    is_a: RoadRegion
+SpatialRelation:
+    abstract: true
+    is_a: Relation
 ```
-They inherit the same attributes and structure `RoadRegion` has
+They inherit the same attributes and structure `Relation` has
 
 #### 2.1.1 Top-level Entry
 
@@ -124,7 +125,7 @@ classes:
 `EgoVehicle` inherits the `id` slot from `RoadUser`, but `slot_usage:` specifies that, **within `EgoVehicle`**, the inherited `id` slot must have the value `"ego"`.
 
 > <font color="red">Important</font>: 
-`slot_usage` doesn't only apply to global slots, it can also be used in inline slots when inheritance, an equivalent definition is found in [line 45, road_users](./road_users.yaml). You can see the field `id` is only identified inline.
+`slot_usage` doesn't only apply to global slots, it can also be used in inline slots when inheritance, an equivalent definition is found in [line 63, objects](./objects.yaml). You can see the field `id` is only identified inline.
 
 ---
 
