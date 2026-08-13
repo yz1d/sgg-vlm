@@ -1,0 +1,596 @@
+name: MapLane
+description: MapLane
+id: https://w3id.org/MapLane
+imports:
+- linkml:types
+prefixes:
+  linkml: https://w3id.org/linkml/
+  MapLane: https://w3id.org/MapLane
+  EgoVehicle: https://w3id.org/EgoVehicle
+  Entry: https://w3id.org/Entry
+  Frame: https://w3id.org/Frame
+  SceneGraph: https://w3id.org/SceneGraph
+default_prefix: MapLane
+enums:
+  lane_type_enum:
+    permissible_values:
+      VEHICLE:
+        description: VEHICLE
+  object_type_enum:
+    permissible_values:
+      ego:
+        description: ego
+slots:
+  id:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '163'
+    examples:
+    - value: '51362090'
+    identifier: true
+    range: integer
+  is_intersection:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '2'
+    examples:
+    - value: 'False'
+    range: integer
+  lane_type:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '1'
+    examples:
+    - value: VEHICLE
+    range: lane_type_enum
+  left_neighbor_id:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '96'
+    examples:
+    - value: '51361980'
+    range: integer
+  right_neighbor_id:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '38'
+    examples:
+    - value: '51361928'
+    range: integer
+  successors:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '166'
+    examples:
+    - value: '51361982'
+    range: integer
+    multivalued: true
+  predecessors:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '89'
+    examples:
+    - value: '51361988'
+    range: integer
+    multivalued: true
+  position_x:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '156'
+    examples:
+    - value: '5572.419271948951'
+    identifier: true
+    range: float
+  position_y:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '156'
+    examples:
+    - value: '686.4997634391711'
+    range: float
+  position_z:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '156'
+    examples:
+    - value: '-24.260365671867177'
+    range: float
+  translation:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '468'
+    examples:
+    - value: 5572.419271948951 | 686.4997634391711 | -24.260365671867177
+    range: float
+    multivalued: true
+  rotation:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '624'
+    examples:
+    - value: -0.7154894252362598 | -0.004821429773904829 | 0.0012521992901256627 |
+        0.6986058031443481
+    range: float
+    multivalued: true
+  yaw_rad:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '156'
+    examples:
+    - value: '-1.546897031979476'
+    range: float
+  yaw_deg:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '156'
+    examples:
+    - value: '-88.6306712737375'
+    range: float
+  velocity_x:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '155'
+    examples:
+    - value: '0.20735164562716005'
+    range: float
+  velocity_y:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '155'
+    examples:
+    - value: '-8.289741283603302'
+    range: float
+  velocity:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '155'
+    examples:
+    - value: '8.292334125806871'
+    range: float
+  velocity_longitudinal:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '155'
+    examples:
+    - value: '8.292329030813615'
+    range: float
+  velocity_lateral:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '155'
+    examples:
+    - value: '0.009192319997812837'
+    range: float
+  acceleration_x:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '154'
+    examples:
+    - value: '0.20553730959833996'
+    range: float
+  acceleration_y:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '154'
+    examples:
+    - value: '0.04580057504989148'
+    range: float
+  acceleration:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '154'
+    examples:
+    - value: '0.21057843743323912'
+    range: float
+  acceleration_longitudinal:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '154'
+    examples:
+    - value: '-0.04087576642184542'
+    range: float
+  acceleration_lateral:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '154'
+    examples:
+    - value: '0.20657311062006914'
+    range: float
+  yaw_rate:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '155'
+    examples:
+    - value: '0.014033516597820556'
+    range: float
+  object_type:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '1'
+    examples:
+    - value: ego
+    range: object_type_enum
+  lane_id:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '5'
+    examples:
+    - value: '51360845'
+    range: integer
+  yaw:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '10136'
+    examples:
+    - value: '1.618280784598884'
+    range: float
+  timestamp:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '156'
+    examples:
+    - value: '315973878849927222'
+    identifier: true
+    range: integer
+  timestamp_s:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '156'
+    examples:
+    - value: '315973878.84992725'
+    range: float
+  ego_vehicle:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '0'
+    range: string
+  entries:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '1'
+    examples:
+    - value: '[''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'', ''$ref:Entry'',
+        ''$ref:Entry'', ''$ref:Entry'']'
+    range: Entry
+    multivalued: true
+  scenario_uuid:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '1'
+    examples:
+    - value: 11995cbe
+    identifier: true
+    range: string
+  has_map:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '1'
+    examples:
+    - value: 'True'
+    range: integer
+  map_lanes:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '1'
+    examples:
+    - value: '[''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'',
+        ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'', ''$ref:MapLane'']'
+    range: MapLane
+    multivalued: true
+  frames:
+    annotations:
+      num_distinct_values:
+        tag: num_distinct_values
+        value: '1'
+    examples:
+    - value: '[''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'', ''$ref:Frame'',
+        ''$ref:Frame'']'
+    range: Frame
+    multivalued: true
+classes:
+  MapLane:
+    slots:
+    - id
+    - is_intersection
+    - lane_type
+    - left_neighbor_id
+    - right_neighbor_id
+    - successors
+    - predecessors
+    unique_keys:
+      right_neighbor_id_key:
+        unique_key_name: right_neighbor_id_key
+        unique_key_slots:
+        - right_neighbor_id
+  EgoVehicle:
+    slots:
+    - position_x
+    - position_y
+    - position_z
+    - translation
+    - rotation
+    - yaw_rad
+    - yaw_deg
+    - velocity_x
+    - velocity_y
+    - velocity
+    - velocity_longitudinal
+    - velocity_lateral
+    - acceleration_x
+    - acceleration_y
+    - acceleration
+    - acceleration_longitudinal
+    - acceleration_lateral
+    - yaw_rate
+    - object_type
+    - lane_id
+    unique_keys:
+      position_y_key:
+        unique_key_name: position_y_key
+        unique_key_slots:
+        - position_y
+      position_z_key:
+        unique_key_name: position_z_key
+        unique_key_slots:
+        - position_z
+      translation_key:
+        unique_key_name: translation_key
+        unique_key_slots:
+        - translation
+      rotation_key:
+        unique_key_name: rotation_key
+        unique_key_slots:
+        - rotation
+      yaw_rad_key:
+        unique_key_name: yaw_rad_key
+        unique_key_slots:
+        - yaw_rad
+      yaw_deg_key:
+        unique_key_name: yaw_deg_key
+        unique_key_slots:
+        - yaw_deg
+      velocity_x_key:
+        unique_key_name: velocity_x_key
+        unique_key_slots:
+        - velocity_x
+      velocity_y_key:
+        unique_key_name: velocity_y_key
+        unique_key_slots:
+        - velocity_y
+      velocity_key:
+        unique_key_name: velocity_key
+        unique_key_slots:
+        - velocity
+      velocity_longitudinal_key:
+        unique_key_name: velocity_longitudinal_key
+        unique_key_slots:
+        - velocity_longitudinal
+      velocity_lateral_key:
+        unique_key_name: velocity_lateral_key
+        unique_key_slots:
+        - velocity_lateral
+      acceleration_x_key:
+        unique_key_name: acceleration_x_key
+        unique_key_slots:
+        - acceleration_x
+      acceleration_y_key:
+        unique_key_name: acceleration_y_key
+        unique_key_slots:
+        - acceleration_y
+      acceleration_key:
+        unique_key_name: acceleration_key
+        unique_key_slots:
+        - acceleration
+      acceleration_longitudinal_key:
+        unique_key_name: acceleration_longitudinal_key
+        unique_key_slots:
+        - acceleration_longitudinal
+      acceleration_lateral_key:
+        unique_key_name: acceleration_lateral_key
+        unique_key_slots:
+        - acceleration_lateral
+      yaw_rate_key:
+        unique_key_name: yaw_rate_key
+        unique_key_slots:
+        - yaw_rate
+  Entry:
+    slots:
+    - id
+    - position_x
+    - position_y
+    - velocity_x
+    - velocity_y
+    - velocity
+    - velocity_longitudinal
+    - velocity_lateral
+    - acceleration_x
+    - acceleration_y
+    - acceleration
+    - acceleration_longitudinal
+    - acceleration_lateral
+    - yaw
+    - yaw_rate
+    - object_type
+    - lane_id
+    unique_keys:
+      position_x_key:
+        unique_key_name: position_x_key
+        unique_key_slots:
+        - position_x
+      position_y_key:
+        unique_key_name: position_y_key
+        unique_key_slots:
+        - position_y
+      velocity_x_key:
+        unique_key_name: velocity_x_key
+        unique_key_slots:
+        - velocity_x
+      velocity_y_key:
+        unique_key_name: velocity_y_key
+        unique_key_slots:
+        - velocity_y
+      velocity_key:
+        unique_key_name: velocity_key
+        unique_key_slots:
+        - velocity
+      velocity_longitudinal_key:
+        unique_key_name: velocity_longitudinal_key
+        unique_key_slots:
+        - velocity_longitudinal
+      velocity_lateral_key:
+        unique_key_name: velocity_lateral_key
+        unique_key_slots:
+        - velocity_lateral
+      acceleration_x_key:
+        unique_key_name: acceleration_x_key
+        unique_key_slots:
+        - acceleration_x
+      acceleration_y_key:
+        unique_key_name: acceleration_y_key
+        unique_key_slots:
+        - acceleration_y
+      acceleration_key:
+        unique_key_name: acceleration_key
+        unique_key_slots:
+        - acceleration
+      acceleration_longitudinal_key:
+        unique_key_name: acceleration_longitudinal_key
+        unique_key_slots:
+        - acceleration_longitudinal
+      acceleration_lateral_key:
+        unique_key_name: acceleration_lateral_key
+        unique_key_slots:
+        - acceleration_lateral
+  Frame:
+    slots:
+    - timestamp
+    - timestamp_s
+    - ego_vehicle
+    - entries
+    unique_keys:
+      timestamp_s_key:
+        unique_key_name: timestamp_s_key
+        unique_key_slots:
+        - timestamp_s
+      ego_vehicle_key:
+        unique_key_name: ego_vehicle_key
+        unique_key_slots:
+        - ego_vehicle
+  SceneGraph:
+    slots:
+    - scenario_uuid
+    - has_map
+    - map_lanes
+    - frames
+    tree_root: true
+    unique_keys:
+      has_map_key:
+        unique_key_name: has_map_key
+        unique_key_slots:
+        - has_map

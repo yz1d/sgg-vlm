@@ -10,3 +10,5 @@ __pycache__/
 outputs/
 *.tldraw
 tmp/
+schema_automator/data/vedecom*
+schema_automator/schema/vedecom*
