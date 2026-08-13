@@ -1,4 +1,6 @@
 # Schema Automator
+Using a Python Package: `schema-automator` to help generate schema yaml files from JSON data file.
+
 The shcema automator POC for the example JSON file in the vedecom-data-pipeline repo, one can obstain the example schema by running
 ```bash
 python schema_automator/generate_schema_from_json.py
