@@ -138,7 +138,7 @@ In the table summarizing LinkML Syntax, the only construct for attributes is `ra
 | `minimum_value`  | self-explanatory | [line 43, common](./common.yaml)
 | `maximum_value`  | self-explanatory | ---
 | `required` | boolean, self-explanatory  | [line 44, common](./common.yaml)
-| `multivalued`  | boolean, array attributes  | [line 35, relationships](./relationships.yaml), another good example is `frames` in JSON we generated before
+| `multivalued`  | boolean, array attributes  | [line 34, relations](./relations.yaml), another good example is `frames` in JSON we generated before
 | `inlined_as_list`  | boolean, stating whether the list objects should be written directly as list under the field, find more details in the section below  | [scene_graph](./scene_graph.yaml)
 | `identifier`  | boolean; marks the attribute as an identifier for instances of the class | ---
 | `pattern`  | regular expression to match strings of pattern | ---
